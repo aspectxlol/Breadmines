@@ -1,0 +1,20 @@
+name: breadmines
+version: '1.0-SNAPSHOT'
+main: com.aspectxlol.breadmines.Breadmines
+api-version: '1.21'
+softdepend: [Skript]
+
+commands:
+  drops:
+    description: "Manage custom block drops"
+    usage: "/drops <create|delete|read> <block_name> [item_id]"
+    permission: admin.setup
+  dropslist:
+    description: "List all registered block drops with pagination"
+    usage: "/dropslist [page]"
+    permission: admin.setup
+
+permissions:
+  admin.setup:
+    description: "Permission to manage custom drops"
+    default: op
