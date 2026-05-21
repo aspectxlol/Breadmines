@@ -142,8 +142,7 @@ public final class Breadmines extends JavaPlugin implements Listener, CommandExe
                 Material customMaterial = resolveCustomMaterial(itemId);
                 if (customMaterial != null) {
                     ItemStack customDrop = new ItemStack(customMaterial, Math.max(1, nativeFortuneAmount));
-                    block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), customDrop);
-                    getLogger().info("Dropped custom Bukkit item: " + customMaterial + " x" + customDrop.getAmount() + " for block " + blockName);
+                    giveItemToPlayer(player, customDrop, block, blockName);
                 } else {
                     Object skriptItem = getSkriptItemValue(itemId);
                     if (debugMode) {
@@ -153,8 +152,7 @@ public final class Breadmines extends JavaPlugin implements Listener, CommandExe
                     if (skriptItem instanceof ItemStack) {
                         ItemStack customDrop = ((ItemStack) skriptItem).clone();
                         customDrop.setAmount(Math.max(1, nativeFortuneAmount));
-                        block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), customDrop);
-                        getLogger().info("Dropped custom Skript ItemStack for alias: " + itemId + " x" + customDrop.getAmount());
+                        giveItemToPlayer(player, customDrop, block, blockName);
                     } else {
                         getLogger().info("Block break intercepted: " + blockName + " -> " + itemId + " (Skript alias/custom item)");
                     }
@@ -217,6 +215,16 @@ public final class Breadmines extends JavaPlugin implements Listener, CommandExe
                 .replace(" ", "_");
 
         return Material.matchMaterial(normalized);
+    }
+
+    private void giveItemToPlayer(Player player, ItemStack itemStack, Block block, String blockName) {
+        Map<Integer, ItemStack> leftovers = player.getInventory().addItem(itemStack);
+        if (leftovers.isEmpty()) {
+            getLogger().info("Added custom drop to inventory: " + itemStack.getType() + " x" + itemStack.getAmount() + " for block " + blockName);
+        } else {
+            leftovers.values().forEach(remaining -> block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), remaining));
+            getLogger().warning("Inventory full for player " + player.getName() + "; dropped leftover custom drop for block " + blockName);
+        }
     }
 
     private Object getSkriptItemValue(String itemId) {
