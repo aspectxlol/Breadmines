@@ -1,0 +1,127 @@
+
+on join:
+    if {mana::%player's uuid%} is not set:
+        set {mana::%player's uuid%} to 500
+
+every 10 ticks:
+    loop all players:
+        if {mana::%loop-player's uuid%} is not set:
+            set {mana::%loop-player's uuid%} to 500
+
+        if {mana::%loop-player's uuid%} < 500:
+            add 7.5 to {mana::%loop-player's uuid%}
+            if {mana::%loop-player's uuid%} > 500:
+                set {mana::%loop-player's uuid%} to 500
+
+        set {_health} to round(loop-player's health)
+        set {_maxHealth} to round(loop-player's max health)
+        set {_mana} to round({mana::%loop-player's uuid%})
+        if {_mana} > 500:
+            set {_mana} to 500
+
+        set {_healthColor} to "&a"
+        if {_health} <= {_maxHealth} * 0.5:
+            set {_healthColor} to "&e"
+        if {_health} <= {_maxHealth} * 0.25:
+            set {_healthColor} to "&c"
+
+        set {_manaColor} to "&b"
+        if {_mana} <= 100:
+            set {_manaColor} to "&3"
+
+        send action bar "%{_healthColor}%❤ %{_health}%&7/%{_maxHealth}% &8┃ %{_manaColor}%✎ %{_mana}%&7/500" to loop-player
+
+on right click:
+    if player's tool is {items::hyperion}:
+        cancel event
+        set {_cost} to 250
+        if {mana::%player's uuid%} < {_cost}:
+            send action bar "&c&lNOT ENOUGH MANA! &7(Requires %{_cost}%M)" to player
+            play sound "entity.ender_dragon.flap" with volume 0.5 and pitch 0.5 to player
+            stop
+
+        set {_targetLoc} to location 10 meters in front of player
+        loop blocks between player and {_targetLoc}:
+            if loop-block is solid:
+                set {_targetLoc} to location 1 meter behind loop-block
+                stop loop
+
+        add 1 to y-coord of {_targetLoc}
+        set yaw of {_targetLoc} to yaw of player's location
+        set pitch of {_targetLoc} to pitch of player's location
+        teleport player to {_targetLoc}
+
+        remove {_cost} from {mana::%player's uuid%}
+        send action bar "&b-250 Mana &8(&b%{mana::%player's uuid%}%&3/500&8)" to player
+        play sound "entity.generic.explode" with volume 1 and pitch 1 at player
+
+        loop living entities in radius 5 around player:
+            if loop-entity is not player:
+                damage loop-entity by 1
+
+    else if player's tool is {items::aotv}:
+        cancel event
+        if player is sneaking:
+            set {_cost} to 100
+            if {mana::%player's uuid%} < {_cost}:
+                send action bar "&c&lNOT ENOUGH MANA! &7(Requires %{_cost}%M)" to player
+                play sound "entity.ender_dragon.flap" with volume 0.5 and pitch 0.5 to player
+                stop
+
+            set {_targetBlock} to targeted block of player
+            if {_targetBlock} is air:
+                send "&cNo target block found in range!" to player
+                stop
+            if distance between player and {_targetBlock} > 60:
+                send "&cCannot warp that far!" to player
+                stop
+            if {_targetBlock} is barrier:
+                send "&cYou cannot warp to boundary blocks!" to player
+                stop
+            if block 1 block above {_targetBlock} is barrier:
+                send "&cYou cannot warp past the ceiling!" to player
+                stop
+            if block 1 block above {_targetBlock} is not air or cave air or void air:
+                send "&cThere is a block in the way of your landing zone!" to player
+                stop
+            if block 2 blocks above {_targetBlock} is not air or cave air or void air:
+                send "&cThere is a block in the way of your head!" to player
+                stop
+
+            set {_startLoc} to player's location
+            set {_warpLoc} to location 1 block above {_targetBlock}
+            set yaw of {_warpLoc} to yaw of player's location
+            set pitch of {_warpLoc} to pitch of player's location
+            spawn 12 flame particles at {_warpLoc}
+            spawn 12 portal particles at {_warpLoc}
+            teleport player to {_warpLoc}
+
+            remove {_cost} from {mana::%player's uuid%}
+            play sound "entity.enderman.teleport" with pitch 1.2 to player
+            play sound "entity.dragon_fireball.explode" with volume 0.3 and pitch 0.9 at player
+            send action bar "&a&l⚡ ETHER WARP &b-100M &8(&b%{mana::%player's uuid%}%&3/500&8)" to player
+
+        else:
+            set {_cost} to 45
+            if {mana::%player's uuid%} < {_cost}:
+                send action bar "&c&lNOT ENOUGH MANA! &7(Requires %{_cost}%M)" to player
+                play sound "entity.ender_dragon.flap" with volume 0.5 and pitch 0.5 to player
+                stop
+
+            set {_targetLoc} to location 8 meters in front of player
+            loop blocks between player and {_targetLoc}:
+                if loop-block is solid:
+                    set {_targetLoc} to location 1 meter behind loop-block
+                    stop loop
+
+            set {_startLoc} to player's location
+            add 1 to y-coord of {_targetLoc}
+            set yaw of {_targetLoc} to yaw of player's location
+            set pitch of {_targetLoc} to pitch of player's location
+            teleport player to {_targetLoc}
+
+            remove {_cost} from {mana::%player's uuid%}
+            apply speed 2 to player for 3 seconds
+            play sound "entity.enderman.teleport" with volume 1 and pitch 1.5 at player
+            play sound "block.portal.travel" with volume 0.5 and pitch 1 at player
+            send action bar "&b&l✦ TRANSMISSION &3-45M &8(&b%{mana::%player's uuid%}%&3/500&8)" to player

@@ -13,8 +13,19 @@ commands:
     description: "List all registered block drops with pagination"
     usage: "/dropslist [page]"
     permission: admin.setup
+  mana:
+    description: "Control the Breadmines Skyblock system (enable/disable)"
+    usage: "/mana <enable|disable>"
+    permission: breadmines.admin
+  givesword:
+    description: "Give yourself a custom Necron sword"
+    usage: "/givesword <hyperion|astraea|valkyrie|scylla|aotv>"
+    permission: breadmines.admin
 
 permissions:
   admin.setup:
     description: "Permission to manage custom drops"
+    default: op
+  breadmines.admin:
+    description: "Permission to use Breadmines Skyblock admin commands"
     default: op
