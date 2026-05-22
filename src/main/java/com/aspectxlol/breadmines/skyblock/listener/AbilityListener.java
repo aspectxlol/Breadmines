@@ -122,11 +122,16 @@ public class AbilityListener implements Listener {
         ItemStack heldItem = player.getInventory().getItemInMainHand();
 
         // Check if player is holding a custom item
-        if (heldItem == null || !heldItem.hasItemMeta() || !heldItem.getItemMeta().hasDisplayName()) {
+        if (heldItem == null || !heldItem.hasItemMeta()) {
             return;
         }
 
-        String displayName = ChatColor.stripColor(heldItem.getItemMeta().getDisplayName());
+        var itemMeta = heldItem.getItemMeta();
+        if (!itemMeta.hasDisplayName()) {
+            return;
+        }
+
+        String displayName = ChatColor.stripColor(itemMeta.getDisplayName());
         
         // Cancel block interaction/placement
         if (event.getClickedBlock() != null && event.getClickedBlock().getType() != Material.AIR) {
@@ -164,27 +169,33 @@ public class AbilityListener implements Listener {
             return;
         }
 
-        Location playerLoc = player.getLocation();
+        Location playerLoc = player.getLocation().clone();
+        var world = playerLoc.getWorld();
+        if (world == null) return;
 
         // Damage entities in 5-block radius
         for (Entity entity : player.getNearbyEntities(5.0, 5.0, 5.0)) {
-            if (entity instanceof LivingEntity && entity != player) {
-                ((LivingEntity) entity).damage(24.0);
-                if (entity instanceof Player) {
-                    // Simulate vanilla TNT knockback mechanics
-                    org.bukkit.util.Vector knockback = entity.getLocation().toVector().subtract(playerLoc.toVector());
-                    if (knockback.lengthSquared() > 0) {
-                        knockback = knockback.normalize().multiply(1.5).setY(0.4);
-                        entity.setVelocity(knockback);
-                    }
+            if (entity == null || !(entity instanceof LivingEntity) || entity == player) {
+                continue;
+            }
+
+            LivingEntity living = (LivingEntity) entity;
+            living.damage(24.0);
+            
+            // Simulate vanilla TNT knockback mechanics for players
+            if (entity instanceof Player) {
+                org.bukkit.util.Vector knockback = entity.getLocation().toVector().subtract(playerLoc.toVector());
+                if (knockback.lengthSquared() > 0) {
+                    knockback = knockback.normalize().multiply(1.5).setY(0.4);
+                    entity.setVelocity(knockback);
                 }
             }
         }
 
         // Effects
-        playerLoc.getWorld().spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
-        playerLoc.getWorld().spawnParticle(Particle.EXPLOSION, playerLoc, 15, 1.5, 1.5, 1.5, 0.1);
-        playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
+        world.spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
+        world.spawnParticle(Particle.EXPLOSION, playerLoc, 15, 1.5, 1.5, 1.5, 0.1);
+        world.playSound(playerLoc, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
     }
 
     /**
@@ -199,7 +210,9 @@ public class AbilityListener implements Listener {
             return;
         }
 
-        Location playerLoc = player.getLocation();
+        Location playerLoc = player.getLocation().clone();
+        var world = playerLoc.getWorld();
+        if (world == null) return;
 
         // Apply Regeneration and Absorption for 5 seconds (100 ticks)
         PotionEffect regen = new PotionEffect(PotionEffectType.REGENERATION, 100, 1, true, false);
@@ -209,17 +222,18 @@ public class AbilityListener implements Listener {
 
         // Apply to nearby players as well
         for (Entity entity : player.getNearbyEntities(5.0, 5.0, 5.0)) {
-            if (entity instanceof Player && entity != player) {
-                ((Player) entity).addPotionEffect(regen);
-                ((Player) entity).addPotionEffect(absorption);
+            if (entity == null || !(entity instanceof Player) || entity == player) {
+                continue;
             }
+            ((Player) entity).addPotionEffect(regen);
+            ((Player) entity).addPotionEffect(absorption);
         }
 
         // Effects
-        playerLoc.getWorld().spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
-        playerLoc.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, playerLoc, 30, 1.5, 1.5, 1.5, 0.2);
-        playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
-        playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_VILLAGER_YES, 0.8f, 1.0f);
+        world.spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
+        world.spawnParticle(Particle.HAPPY_VILLAGER, playerLoc, 30, 1.5, 1.5, 1.5, 0.2);
+        world.playSound(playerLoc, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
+        world.playSound(playerLoc, Sound.ENTITY_VILLAGER_YES, 0.8f, 1.0f);
     }
 
     /**
@@ -234,8 +248,10 @@ public class AbilityListener implements Listener {
             return;
         }
 
-        Location playerLoc = player.getLocation();
+        Location playerLoc = player.getLocation().clone();
         Location teleportLoc = calculateTeleportLocation(player, 10.0);
+        if (teleportLoc == null) return;
+
         player.teleport(teleportLoc);
 
         // Apply Strength I for 3 seconds (60 ticks)
@@ -244,15 +260,22 @@ public class AbilityListener implements Listener {
 
         // Apply to nearby players as well
         for (Entity entity : player.getNearbyEntities(5.0, 5.0, 5.0)) {
-            if (entity instanceof Player && entity != player) {
-                ((Player) entity).addPotionEffect(strength);
+            if (entity == null || !(entity instanceof Player) || entity == player) {
+                continue;
             }
+            ((Player) entity).addPotionEffect(strength);
         }
 
         // Effects
-        playerLoc.getWorld().spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
-        teleportLoc.getWorld().spawnParticle(Particle.CRIT, teleportLoc, 25, 1.0, 1.0, 1.0, 0.3);
-        teleportLoc.getWorld().playSound(teleportLoc, Sound.ENTITY_IRON_GOLEM_ATTACK, 1.0f, 0.8f);
+        var world = playerLoc.getWorld();
+        var teleportWorld = teleportLoc.getWorld();
+        if (world != null) {
+            world.spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
+        }
+        if (teleportWorld != null) {
+            teleportWorld.spawnParticle(Particle.CRIT, teleportLoc, 25, 1.0, 1.0, 1.0, 0.3);
+            teleportWorld.playSound(teleportLoc, Sound.ENTITY_IRON_GOLEM_ATTACK, 1.0f, 0.8f);
+        }
     }
 
     /**
@@ -267,7 +290,9 @@ public class AbilityListener implements Listener {
             return;
         }
 
-        Location playerLoc = player.getLocation();
+        Location playerLoc = player.getLocation().clone();
+        var world = playerLoc.getWorld();
+        if (world == null) return;
 
         // Apply Speed III for 2.5 seconds (50 ticks)
         PotionEffect speed = new PotionEffect(PotionEffectType.SPEED, 50, 2, true, false);
@@ -275,15 +300,16 @@ public class AbilityListener implements Listener {
 
         // Apply to nearby players as well
         for (Entity entity : player.getNearbyEntities(5.0, 5.0, 5.0)) {
-            if (entity instanceof Player && entity != player) {
-                ((Player) entity).addPotionEffect(speed);
+            if (entity == null || !(entity instanceof Player) || entity == player) {
+                continue;
             }
+            ((Player) entity).addPotionEffect(speed);
         }
 
         // Effects
-        playerLoc.getWorld().spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
-        playerLoc.getWorld().spawnParticle(Particle.CLOUD, playerLoc, 20, 1.5, 1.5, 1.5, 0.2);
-        playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_HORSE_GALLOP, 1.0f, 1.0f);
+        world.spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
+        world.spawnParticle(Particle.CLOUD, playerLoc, 20, 1.5, 1.5, 1.5, 0.2);
+        world.playSound(playerLoc, Sound.ENTITY_HORSE_GALLOP, 1.0f, 1.0f);
     }
 
     /**
@@ -322,17 +348,23 @@ public class AbilityListener implements Listener {
             return;
         }
 
-        Location playerLoc = player.getLocation();
+        Location playerLoc = player.getLocation().clone();
         Location teleportLoc = calculateTeleportLocation(player, 8.0);
+        if (teleportLoc == null) return;
 
-        // Teleport player
         player.teleport(teleportLoc);
 
         // Effects
-        playerLoc.getWorld().spawnParticle(Particle.PORTAL, playerLoc, 15, 0.5, 0.5, 0.5, 0.5);
-        teleportLoc.getWorld().spawnParticle(Particle.DRAGON_BREATH, teleportLoc, 15, 0.5, 0.5, 0.5, 0.3);
-        playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_ENDER_DRAGON_FLAP, 0.7f, 1.2f);
-        teleportLoc.getWorld().playSound(teleportLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 0.8f, 1.0f);
+        var playerWorld = playerLoc.getWorld();
+        var teleportWorld = teleportLoc.getWorld();
+        if (playerWorld != null) {
+            playerWorld.spawnParticle(Particle.PORTAL, playerLoc, 15, 0.5, 0.5, 0.5, 0.5);
+            playerWorld.playSound(playerLoc, Sound.ENTITY_ENDER_DRAGON_FLAP, 0.7f, 1.2f);
+        }
+        if (teleportWorld != null) {
+            teleportWorld.spawnParticle(Particle.DRAGON_BREATH, teleportLoc, 15, 0.5, 0.5, 0.5, 0.3);
+            teleportWorld.playSound(teleportLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 0.8f, 1.0f);
+        }
     }
 
     /**
@@ -347,8 +379,8 @@ public class AbilityListener implements Listener {
             return;
         }
 
-        Location playerLoc = player.getLocation();
-        Block targetBlock = player.getTargetBlockExact(60, org.bukkit.FluidCollisionMode.NEVER);
+        Location playerLoc = player.getLocation().clone();
+        Block targetBlock = player.getTargetBlockExact(60, FluidCollisionMode.NEVER);
 
         // Validate target block
         if (targetBlock == null || targetBlock.getType() == Material.AIR || targetBlock.getType() == Material.BARRIER) {
@@ -368,7 +400,7 @@ public class AbilityListener implements Listener {
         }
 
         // Teleport location is right on top of the block
-        Location targetLoc = targetBlock.getLocation().add(0.5, 1.0, 0.5);
+        Location targetLoc = targetBlock.getLocation().clone().add(0.5, 1.0, 0.5);
         if (playerLoc.distance(targetLoc) > 60.0) {
             manaManager.addMana(player, 100.0);
             player.sendMessage(ChatColor.RED + "✗ Target is too far away");
@@ -378,29 +410,38 @@ public class AbilityListener implements Listener {
         targetLoc.setYaw(player.getLocation().getYaw());
         targetLoc.setPitch(player.getLocation().getPitch());
 
+        var playerWorld = playerLoc.getWorld();
+        var targetWorld = targetLoc.getWorld();
+
         // Effects Before
-        playerLoc.getWorld().spawnParticle(Particle.PORTAL, playerLoc, 20, 0.8, 0.8, 0.8, 0.6);
-        playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_ENDER_DRAGON_FLAP, 0.8f, 1.3f);
+        if (playerWorld != null) {
+            playerWorld.spawnParticle(Particle.PORTAL, playerLoc, 20, 0.8, 0.8, 0.8, 0.6);
+            playerWorld.playSound(playerLoc, Sound.ENTITY_ENDER_DRAGON_FLAP, 0.8f, 1.3f);
+        }
         
         // Teleport player
         player.teleport(targetLoc);
 
         // Effects After
-        targetLoc.getWorld().spawnParticle(Particle.FLAME, targetLoc, 12, 0.5, 0.5, 0.5, 0.3);
-        targetLoc.getWorld().spawnParticle(Particle.DRAGON_BREATH, targetLoc, 20, 0.8, 0.8, 0.8, 0.4);
-        targetLoc.getWorld().spawnParticle(Particle.END_ROD, targetLoc, 15, 0.5, 0.5, 0.5, 0.2);
-        targetLoc.getWorld().playSound(targetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 0.9f, 1.1f);
+        if (targetWorld != null) {
+            targetWorld.spawnParticle(Particle.FLAME, targetLoc, 12, 0.5, 0.5, 0.5, 0.3);
+            targetWorld.spawnParticle(Particle.DRAGON_BREATH, targetLoc, 20, 0.8, 0.8, 0.8, 0.4);
+            targetWorld.spawnParticle(Particle.END_ROD, targetLoc, 15, 0.5, 0.5, 0.5, 0.2);
+            targetWorld.playSound(targetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 0.9f, 1.1f);
+        }
     }
 
     /**
      * Simple, reliable teleport location calculation.
      * Steps forward 0.5 blocks at a time until a solid block is hit.
      * Allows air teleportation.
+     * Returns null if calculation fails (world is null, etc).
      */
     private Location calculateTeleportLocation(Player player, double maxDist) {
         Location loc = player.getLocation().clone();
-        org.bukkit.util.Vector dir = loc.getDirection().normalize();
+        if (loc.getWorld() == null) return null;
 
+        org.bukkit.util.Vector dir = loc.getDirection().normalize();
         Location lastSafe = loc.clone();
 
         for (double d = 0.5; d <= maxDist; d += 0.5) {
