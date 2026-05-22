@@ -19,7 +19,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.util.RayTraceResult;
+import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.entity.Entity;
 
 /**
@@ -41,6 +41,7 @@ public class AbilityListener implements Listener {
 
     private final Breadmines plugin;
     private final ManaManager manaManager;
+    private BukkitTask etherwarpPreviewTask;
 
     public AbilityListener(Breadmines plugin) {
         this.plugin = plugin;
@@ -52,7 +53,7 @@ public class AbilityListener implements Listener {
      * Starts a repeating task that shows preview particles for Etherwarp when player shifts.
      */
     private void startEtherwarpPreviewTask() {
-        new BukkitRunnable() {
+        etherwarpPreviewTask = new BukkitRunnable() {
             @Override
             public void run() {
                 if (!plugin.isSystemEnabled()) {
@@ -65,11 +66,16 @@ public class AbilityListener implements Listener {
                     }
 
                     ItemStack heldItem = player.getInventory().getItemInMainHand();
-                    if (heldItem == null || !heldItem.hasItemMeta() || !heldItem.getItemMeta().hasDisplayName()) {
+                    if (heldItem == null || !heldItem.hasItemMeta()) {
                         continue;
                     }
 
-                    String displayName = ChatColor.stripColor(heldItem.getItemMeta().getDisplayName());
+                    var itemMeta = heldItem.getItemMeta();
+                    if (!itemMeta.hasDisplayName()) {
+                        continue;
+                    }
+
+                    String displayName = ChatColor.stripColor(itemMeta.getDisplayName());
                     
                     // Show preview only for Aspect of the Void
                     if (!displayName.equals("Aspect of the Void")) {
@@ -77,7 +83,7 @@ public class AbilityListener implements Listener {
                     }
 
                     // Show Ether Warp target particles at crosshair target location
-                    Block targetBlock = player.getTargetBlockExact(60, org.bukkit.FluidCollisionMode.NEVER);
+                    Block targetBlock = player.getTargetBlockExact(60, FluidCollisionMode.NEVER);
                     if (targetBlock != null && targetBlock.getType() != Material.AIR && targetBlock.getType() != Material.BARRIER) {
                         Block feetBlock = targetBlock.getRelative(org.bukkit.block.BlockFace.UP);
                         Block headBlock = feetBlock.getRelative(org.bukkit.block.BlockFace.UP);
@@ -148,8 +154,8 @@ public class AbilityListener implements Listener {
     }
 
     /**
-     * Hyperion Ability: Wither Implosion + Teleport
-     * Teleports player forward 10 blocks in the direction they're facing, spawns particles, and damages nearby entities.
+     * Hyperion Ability: Wither Implosion
+     * Spawns particles and damages nearby entities.
      * Mana Cost: 150
      */
     private void handleHyperion(Player player, PlayerInteractEvent event) {
@@ -159,27 +165,31 @@ public class AbilityListener implements Listener {
         }
 
         Location playerLoc = player.getLocation();
-        Location teleportLoc = calculateTeleportLocation(player, 10.0);
 
-        // Teleport player
-        player.teleport(teleportLoc);
-
-        // Damage entities in 5-block radius around new location
+        // Damage entities in 5-block radius
         for (Entity entity : player.getNearbyEntities(5.0, 5.0, 5.0)) {
-            if (entity instanceof LivingEntity && !(entity instanceof Player)) {
+            if (entity instanceof LivingEntity && entity != player) {
                 ((LivingEntity) entity).damage(24.0);
+                if (entity instanceof Player) {
+                    // Simulate vanilla TNT knockback mechanics
+                    org.bukkit.util.Vector knockback = entity.getLocation().toVector().subtract(playerLoc.toVector());
+                    if (knockback.lengthSquared() > 0) {
+                        knockback = knockback.normalize().multiply(1.5).setY(0.4);
+                        entity.setVelocity(knockback);
+                    }
+                }
             }
         }
 
         // Effects
         playerLoc.getWorld().spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
-        teleportLoc.getWorld().spawnParticle(Particle.EXPLOSION, teleportLoc, 15, 1.5, 1.5, 1.5, 0.1);
+        playerLoc.getWorld().spawnParticle(Particle.EXPLOSION, playerLoc, 15, 1.5, 1.5, 1.5, 0.1);
         playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
     }
 
     /**
      * Astraea Ability: Wither Healing
-     * Applies Regeneration and Absorption.
+     * Applies Regeneration and Absorption to player and nearby players.
      * Plays level-up and villager happy sounds with healing particles.
      * Mana Cost: 150
      */
@@ -190,18 +200,26 @@ public class AbilityListener implements Listener {
         }
 
         Location playerLoc = player.getLocation();
-        Location teleportLoc = calculateTeleportLocation(player, 10.0);
-        player.teleport(teleportLoc);
 
         // Apply Regeneration and Absorption for 5 seconds (100 ticks)
-        player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 100, 1, true, false));
-        player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 100, 1, true, false));
+        PotionEffect regen = new PotionEffect(PotionEffectType.REGENERATION, 100, 1, true, false);
+        PotionEffect absorption = new PotionEffect(PotionEffectType.ABSORPTION, 100, 1, true, false);
+        player.addPotionEffect(regen);
+        player.addPotionEffect(absorption);
+
+        // Apply to nearby players as well
+        for (Entity entity : player.getNearbyEntities(5.0, 5.0, 5.0)) {
+            if (entity instanceof Player && entity != player) {
+                ((Player) entity).addPotionEffect(regen);
+                ((Player) entity).addPotionEffect(absorption);
+            }
+        }
 
         // Effects
         playerLoc.getWorld().spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
-        teleportLoc.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, teleportLoc, 30, 1.5, 1.5, 1.5, 0.2);
-        teleportLoc.getWorld().playSound(teleportLoc, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
-        teleportLoc.getWorld().playSound(teleportLoc, Sound.ENTITY_VILLAGER_YES, 0.8f, 1.0f);
+        playerLoc.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, playerLoc, 30, 1.5, 1.5, 1.5, 0.2);
+        playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
+        playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_VILLAGER_YES, 0.8f, 1.0f);
     }
 
     /**
@@ -221,7 +239,15 @@ public class AbilityListener implements Listener {
         player.teleport(teleportLoc);
 
         // Apply Strength I for 3 seconds (60 ticks)
-        player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 60, 0, true, false));
+        PotionEffect strength = new PotionEffect(PotionEffectType.STRENGTH, 60, 0, true, false);
+        player.addPotionEffect(strength);
+
+        // Apply to nearby players as well
+        for (Entity entity : player.getNearbyEntities(5.0, 5.0, 5.0)) {
+            if (entity instanceof Player && entity != player) {
+                ((Player) entity).addPotionEffect(strength);
+            }
+        }
 
         // Effects
         playerLoc.getWorld().spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
@@ -231,7 +257,7 @@ public class AbilityListener implements Listener {
 
     /**
      * Scylla Ability: Wither Swiftness
-     * Applies Speed III for 2.5 seconds (50 ticks).
+     * Applies Speed III for 2.5 seconds (50 ticks) to player and nearby players.
      * Plays horse gallop sound with cloud particles.
      * Mana Cost: 150
      */
@@ -242,16 +268,22 @@ public class AbilityListener implements Listener {
         }
 
         Location playerLoc = player.getLocation();
-        Location teleportLoc = calculateTeleportLocation(player, 10.0);
-        player.teleport(teleportLoc);
 
         // Apply Speed III for 2.5 seconds (50 ticks)
-        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 50, 2, true, false));
+        PotionEffect speed = new PotionEffect(PotionEffectType.SPEED, 50, 2, true, false);
+        player.addPotionEffect(speed);
+
+        // Apply to nearby players as well
+        for (Entity entity : player.getNearbyEntities(5.0, 5.0, 5.0)) {
+            if (entity instanceof Player && entity != player) {
+                ((Player) entity).addPotionEffect(speed);
+            }
+        }
 
         // Effects
         playerLoc.getWorld().spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
-        teleportLoc.getWorld().spawnParticle(Particle.CLOUD, teleportLoc, 20, 1.5, 1.5, 1.5, 0.2);
-        teleportLoc.getWorld().playSound(teleportLoc, Sound.ENTITY_HORSE_GALLOP, 1.0f, 1.0f);
+        playerLoc.getWorld().spawnParticle(Particle.CLOUD, playerLoc, 20, 1.5, 1.5, 1.5, 0.2);
+        playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_HORSE_GALLOP, 1.0f, 1.0f);
     }
 
     /**
