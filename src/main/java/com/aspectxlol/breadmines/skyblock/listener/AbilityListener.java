@@ -249,10 +249,8 @@ public class AbilityListener implements Listener {
         }
 
         Location playerLoc = player.getLocation().clone();
-        Location teleportLoc = calculateTeleportLocation(player, 10.0);
-        if (teleportLoc == null) return;
-
-        player.teleport(teleportLoc);
+        var world = playerLoc.getWorld();
+        if (world == null) return;
 
         // Apply Strength I for 3 seconds (60 ticks)
         PotionEffect strength = new PotionEffect(PotionEffectType.STRENGTH, 60, 0, true, false);
@@ -267,15 +265,8 @@ public class AbilityListener implements Listener {
         }
 
         // Effects
-        var world = playerLoc.getWorld();
-        var teleportWorld = teleportLoc.getWorld();
-        if (world != null) {
-            world.spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
-        }
-        if (teleportWorld != null) {
-            teleportWorld.spawnParticle(Particle.CRIT, teleportLoc, 25, 1.0, 1.0, 1.0, 0.3);
-            teleportWorld.playSound(teleportLoc, Sound.ENTITY_IRON_GOLEM_ATTACK, 1.0f, 0.8f);
-        }
+        world.spawnParticle(Particle.CRIT, playerLoc, 25, 1.0, 1.0, 1.0, 0.3);
+        world.playSound(playerLoc, Sound.ENTITY_IRON_GOLEM_ATTACK, 1.0f, 0.8f);
     }
 
     /**
