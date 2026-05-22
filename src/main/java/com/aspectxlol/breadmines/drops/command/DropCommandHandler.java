@@ -2,16 +2,12 @@ package com.aspectxlol.breadmines.drops.command;
 
 import com.aspectxlol.breadmines.drops.DropSystemHandler;
 import org.bukkit.Material;
-import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
-import ch.njol.skript.variables.Variables;
 
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 

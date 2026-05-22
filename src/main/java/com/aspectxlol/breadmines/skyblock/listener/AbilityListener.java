@@ -7,8 +7,8 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
+import org.bukkit.FluidCollisionMode;
 import org.bukkit.block.Block;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -18,7 +18,9 @@ import org.bukkit.event.block.Action;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import org.bukkit.util.Vector;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.util.RayTraceResult;
+import org.bukkit.entity.Entity;
 
 /**
  * AbilityListener - Handles right-click ability triggers for custom Necron items.
@@ -43,10 +45,62 @@ public class AbilityListener implements Listener {
     public AbilityListener(Breadmines plugin) {
         this.plugin = plugin;
         this.manaManager = plugin.getManaManager();
+        startEtherwarpPreviewTask();
+    }
+
+    /**
+     * Starts a repeating task that shows preview particles for Etherwarp when player shifts.
+     */
+    private void startEtherwarpPreviewTask() {
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!plugin.isSystemEnabled()) {
+                    return;
+                }
+
+                for (Player player : plugin.getServer().getOnlinePlayers()) {
+                    if (player == null || !player.isSneaking()) {
+                        continue;
+                    }
+
+                    ItemStack heldItem = player.getInventory().getItemInMainHand();
+                    if (heldItem == null || !heldItem.hasItemMeta() || !heldItem.getItemMeta().hasDisplayName()) {
+                        continue;
+                    }
+
+                    String displayName = ChatColor.stripColor(heldItem.getItemMeta().getDisplayName());
+                    
+                    // Show preview only for Aspect of the Void
+                    if (!displayName.equals("Aspect of the Void")) {
+                        continue;
+                    }
+
+                    // Show Ether Warp target particles at crosshair target location
+                    Block targetBlock = player.getTargetBlockExact(60, org.bukkit.FluidCollisionMode.NEVER);
+                    if (targetBlock != null && targetBlock.getType() != Material.AIR && targetBlock.getType() != Material.BARRIER) {
+                        Block feetBlock = targetBlock.getRelative(org.bukkit.block.BlockFace.UP);
+                        Block headBlock = feetBlock.getRelative(org.bukkit.block.BlockFace.UP);
+                        if (!feetBlock.getType().isSolid() && !headBlock.getType().isSolid() && feetBlock.getType() != Material.BARRIER && headBlock.getType() != Material.BARRIER) {
+                            Location targetLoc = targetBlock.getLocation().clone().add(0.5, 1.0, 0.5);
+                            if (player.getLocation().distance(targetLoc) <= 60.0) {
+                                // spawnParticle on the player object means it's client-side only and visible only to them!
+                                player.spawnParticle(Particle.ENCHANT, targetLoc, 2, 0.2, 0.2, 0.2, 0.05);
+                                player.spawnParticle(Particle.END_ROD, targetLoc, 1, 0.1, 0.1, 0.1, 0.0);
+                            }
+                        }
+                    }
+                }
+            }
+        }.runTaskTimer(plugin, 0L, 2L); // Update every 2 ticks
     }
 
     @EventHandler
     public void onPlayerInteract(PlayerInteractEvent event) {
+        if (event == null || event.getPlayer() == null) {
+            return;
+        }
+        
         Player player = event.getPlayer();
 
         // Cancel if system is disabled
@@ -94,8 +148,8 @@ public class AbilityListener implements Listener {
     }
 
     /**
-     * Hyperion Ability: Wither Implosion
-     * Spawns AoE particles, plays explosion sound, and damages non-player entities within 5-block radius by 24 damage (12 hearts).
+     * Hyperion Ability: Wither Implosion + Teleport
+     * Teleports player forward 10 blocks in the direction they're facing, spawns particles, and damages nearby entities.
      * Mana Cost: 150
      */
     private void handleHyperion(Player player, PlayerInteractEvent event) {
@@ -105,25 +159,27 @@ public class AbilityListener implements Listener {
         }
 
         Location playerLoc = player.getLocation();
+        Location teleportLoc = calculateTeleportLocation(player, 10.0);
 
-        // Damage entities in 5-block radius
+        // Teleport player
+        player.teleport(teleportLoc);
+
+        // Damage entities in 5-block radius around new location
         for (Entity entity : player.getNearbyEntities(5.0, 5.0, 5.0)) {
             if (entity instanceof LivingEntity && !(entity instanceof Player)) {
                 ((LivingEntity) entity).damage(24.0);
             }
         }
 
-        // Effects - All scheduled on main thread (already on main thread from event)
+        // Effects
         playerLoc.getWorld().spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
-        playerLoc.getWorld().spawnParticle(Particle.EXPLOSION, playerLoc, 15, 1.5, 1.5, 1.5, 0.1);
+        teleportLoc.getWorld().spawnParticle(Particle.EXPLOSION, teleportLoc, 15, 1.5, 1.5, 1.5, 0.1);
         playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
-
-        player.sendMessage(ChatColor.LIGHT_PURPLE + "⚔ Hyperion: Wither Implosion activated!");
     }
 
     /**
      * Astraea Ability: Wither Healing
-     * Instantly heals the player by 4 health points (2 hearts).
+     * Applies Regeneration and Absorption.
      * Plays level-up and villager happy sounds with healing particles.
      * Mana Cost: 150
      */
@@ -134,17 +190,18 @@ public class AbilityListener implements Listener {
         }
 
         Location playerLoc = player.getLocation();
+        Location teleportLoc = calculateTeleportLocation(player, 10.0);
+        player.teleport(teleportLoc);
 
-        // Heal player (4 health = 2 hearts)
-        double newHealth = Math.min(player.getHealth() + 4.0, player.getMaxHealth());
-        player.setHealth(newHealth);
+        // Apply Regeneration and Absorption for 5 seconds (100 ticks)
+        player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 100, 1, true, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 100, 1, true, false));
 
         // Effects
-        playerLoc.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, playerLoc, 30, 1.5, 1.5, 1.5, 0.2);
-        playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
-        playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_VILLAGER_YES, 0.8f, 1.0f);
-
-        player.sendMessage(ChatColor.GREEN + "⚔ Astraea: Wither Healing activated!");
+        playerLoc.getWorld().spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
+        teleportLoc.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, teleportLoc, 30, 1.5, 1.5, 1.5, 0.2);
+        teleportLoc.getWorld().playSound(teleportLoc, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
+        teleportLoc.getWorld().playSound(teleportLoc, Sound.ENTITY_VILLAGER_YES, 0.8f, 1.0f);
     }
 
     /**
@@ -160,15 +217,16 @@ public class AbilityListener implements Listener {
         }
 
         Location playerLoc = player.getLocation();
+        Location teleportLoc = calculateTeleportLocation(player, 10.0);
+        player.teleport(teleportLoc);
 
         // Apply Strength I for 3 seconds (60 ticks)
         player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 60, 0, true, false));
 
         // Effects
-        playerLoc.getWorld().spawnParticle(Particle.CRIT, playerLoc, 25, 1.0, 1.0, 1.0, 0.3);
-        playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_IRON_GOLEM_ATTACK, 1.0f, 0.8f);
-
-        player.sendMessage(ChatColor.YELLOW + "⚔ Valkyrie: Ferocious Dash activated!");
+        playerLoc.getWorld().spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
+        teleportLoc.getWorld().spawnParticle(Particle.CRIT, teleportLoc, 25, 1.0, 1.0, 1.0, 0.3);
+        teleportLoc.getWorld().playSound(teleportLoc, Sound.ENTITY_IRON_GOLEM_ATTACK, 1.0f, 0.8f);
     }
 
     /**
@@ -184,19 +242,20 @@ public class AbilityListener implements Listener {
         }
 
         Location playerLoc = player.getLocation();
+        Location teleportLoc = calculateTeleportLocation(player, 10.0);
+        player.teleport(teleportLoc);
 
         // Apply Speed III for 2.5 seconds (50 ticks)
         player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 50, 2, true, false));
 
         // Effects
-        playerLoc.getWorld().spawnParticle(Particle.CLOUD, playerLoc, 20, 1.5, 1.5, 1.5, 0.2);
-        playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_HORSE_GALLOP, 1.0f, 1.0f);
-
-        player.sendMessage(ChatColor.AQUA + "⚔ Scylla: Wither Swiftness activated!");
+        playerLoc.getWorld().spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
+        teleportLoc.getWorld().spawnParticle(Particle.CLOUD, teleportLoc, 20, 1.5, 1.5, 1.5, 0.2);
+        teleportLoc.getWorld().playSound(teleportLoc, Sound.ENTITY_HORSE_GALLOP, 1.0f, 1.0f);
     }
 
     /**
-     * Aspect of the Void Ability: Ether Transmission (Teleport)
+     * Aspect of the Void Ability: Ether Transmission / Ether Warp (Teleport)
      * 
      * CRITICAL THREAD SAFETY:
      * - Teleportation (player.teleport()) happens on the main thread (we're already here from event)
@@ -204,31 +263,35 @@ public class AbilityListener implements Listener {
      * - Mana deduction uses thread-safe ConcurrentHashMap (safe from async thread)
      * 
      * Features:
-     * - Universal teleport engine with 8-block line-of-sight raycast
+     * - RIGHT CLICK: Transmission - Forward dash up to 8 blocks with particle effects
+     * - SHIFT + RIGHT CLICK: Ether Warp - Targeted teleport up to 60 blocks with barrier protection
      * - Block collision checks to prevent clipping into solid blocks
-     * - Preserves player head pitch and yaw
-     * - Plays portal particles and enderman teleport sound
-     * - Mana Cost: 45
+     * - Preserves player's current pitch and yaw
+     * - Shows preview particles on shift
      */
     private void handleAspectOfTheVoid(Player player, PlayerInteractEvent event) {
+        if (player.isSneaking()) {
+            // ETHER WARP - Shift + Right Click (60 block max range)
+            handleEtherWarp(player, event);
+        } else {
+            // TRANSMISSION - Right Click (8 block forward dash)
+            handleTransmission(player, event);
+        }
+    }
+
+    /**
+     * Transmission Ability: Short-range forward dash
+     * Teleports player 8 blocks forward with particle effects.
+     * Mana Cost: 45
+     */
+    private void handleTransmission(Player player, PlayerInteractEvent event) {
         if (!manaManager.deductMana(player, 45.0)) {
             player.sendMessage(ChatColor.RED + "✗ Insufficient mana (need 45)");
             return;
         }
 
         Location playerLoc = player.getLocation();
-        Location teleportLoc = calculateTeleportLocation(player);
-
-        if (teleportLoc == null) {
-            // Refund mana if teleport is blocked
-            manaManager.addMana(player, 45.0);
-            player.sendMessage(ChatColor.RED + "✗ Cannot teleport: Obstruction detected");
-            return;
-        }
-
-        // Preserve pitch and yaw
-        teleportLoc.setPitch(player.getLocation().getPitch());
-        teleportLoc.setYaw(player.getLocation().getYaw());
+        Location teleportLoc = calculateTeleportLocation(player, 8.0);
 
         // Teleport player
         player.teleport(teleportLoc);
@@ -238,45 +301,92 @@ public class AbilityListener implements Listener {
         teleportLoc.getWorld().spawnParticle(Particle.DRAGON_BREATH, teleportLoc, 15, 0.5, 0.5, 0.5, 0.3);
         playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_ENDER_DRAGON_FLAP, 0.7f, 1.2f);
         teleportLoc.getWorld().playSound(teleportLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 0.8f, 1.0f);
-
-        player.sendMessage(ChatColor.DARK_PURPLE + "⚔ Aspect of the Void: Ether Transmission activated!");
     }
 
     /**
-     * Calculates safe teleport location using raycast.
-     * Scans 8 blocks forward in player's look direction.
-     * Returns null if obstruction detected (prevents clipping).
+     * Ether Warp Ability: Long-range targeted teleport
+     * Teleports player to targeted block up to 60 blocks away.
+     * Blocks barriers and checks for safe landing spots.
+     * Mana Cost: 100
      */
-    private Location calculateTeleportLocation(Player player) {
-        Location startLoc = player.getLocation().clone();
-        Vector direction = startLoc.getDirection().normalize();
-
-        // Raycast 8 blocks forward
-        for (int i = 1; i <= 8; i++) {
-            Location checkLoc = startLoc.add(direction.clone().multiply(i));
-            Block block = checkLoc.getBlock();
-            Block blockAbove = checkLoc.clone().add(0, 1, 0).getBlock();
-
-            // Check if both current and above blocks are non-solid (safe to stand)
-            if (!isSolid(block) && !isSolid(blockAbove)) {
-                // Ground check: ensure there's a solid block below
-                Block blockBelow = checkLoc.clone().add(0, -1, 0).getBlock();
-                if (isSolid(blockBelow)) {
-                    checkLoc.setY(checkLoc.getY() + 0.5); // Add small offset for player feet
-                    return checkLoc;
-                }
-            }
+    private void handleEtherWarp(Player player, PlayerInteractEvent event) {
+        if (!manaManager.deductMana(player, 100.0)) {
+            player.sendMessage(ChatColor.RED + "✗ Insufficient mana (need 100)");
+            return;
         }
 
-        return null; // No safe location found
+        Location playerLoc = player.getLocation();
+        Block targetBlock = player.getTargetBlockExact(60, org.bukkit.FluidCollisionMode.NEVER);
+
+        // Validate target block
+        if (targetBlock == null || targetBlock.getType() == Material.AIR || targetBlock.getType() == Material.BARRIER) {
+            manaManager.addMana(player, 100.0);
+            player.sendMessage(ChatColor.RED + "✗ No valid target block found");
+            return;
+        }
+
+        // Check if landing zone is safe (2 blocks of air above)
+        Block feetBlock = targetBlock.getRelative(org.bukkit.block.BlockFace.UP);
+        Block headBlock = feetBlock.getRelative(org.bukkit.block.BlockFace.UP);
+
+        if (feetBlock.getType().isSolid() || headBlock.getType().isSolid() || feetBlock.getType() == Material.BARRIER || headBlock.getType() == Material.BARRIER) {
+            manaManager.addMana(player, 100.0);
+            player.sendMessage(ChatColor.RED + "✗ Landing zone is obstructed");
+            return;
+        }
+
+        // Teleport location is right on top of the block
+        Location targetLoc = targetBlock.getLocation().add(0.5, 1.0, 0.5);
+        if (playerLoc.distance(targetLoc) > 60.0) {
+            manaManager.addMana(player, 100.0);
+            player.sendMessage(ChatColor.RED + "✗ Target is too far away");
+            return;
+        }
+
+        targetLoc.setYaw(player.getLocation().getYaw());
+        targetLoc.setPitch(player.getLocation().getPitch());
+
+        // Effects Before
+        playerLoc.getWorld().spawnParticle(Particle.PORTAL, playerLoc, 20, 0.8, 0.8, 0.8, 0.6);
+        playerLoc.getWorld().playSound(playerLoc, Sound.ENTITY_ENDER_DRAGON_FLAP, 0.8f, 1.3f);
+        
+        // Teleport player
+        player.teleport(targetLoc);
+
+        // Effects After
+        targetLoc.getWorld().spawnParticle(Particle.FLAME, targetLoc, 12, 0.5, 0.5, 0.5, 0.3);
+        targetLoc.getWorld().spawnParticle(Particle.DRAGON_BREATH, targetLoc, 20, 0.8, 0.8, 0.8, 0.4);
+        targetLoc.getWorld().spawnParticle(Particle.END_ROD, targetLoc, 15, 0.5, 0.5, 0.5, 0.2);
+        targetLoc.getWorld().playSound(targetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 0.9f, 1.1f);
     }
 
     /**
-     * Checks if a block is solid and should block teleportation.
-     * Ignores water, lava, and other non-blocking materials.
+     * Simple, reliable teleport location calculation.
+     * Steps forward 0.5 blocks at a time until a solid block is hit.
+     * Allows air teleportation.
      */
-    private boolean isSolid(Block block) {
-        Material type = block.getType();
-        return type.isSolid() && type != Material.WATER && type != Material.LAVA;
+    private Location calculateTeleportLocation(Player player, double maxDist) {
+        Location loc = player.getLocation().clone();
+        org.bukkit.util.Vector dir = loc.getDirection().normalize();
+
+        Location lastSafe = loc.clone();
+
+        for (double d = 0.5; d <= maxDist; d += 0.5) {
+            Location check = loc.clone().add(dir.clone().multiply(d));
+            
+            Block feet = check.getBlock();
+            Block head = check.clone().add(0, 1.0, 0).getBlock();
+
+            // Stop if we hit a solid block
+            if (feet.getType().isSolid() || head.getType().isSolid() || feet.getType() == Material.BARRIER || head.getType() == Material.BARRIER) {
+                break;
+            }
+
+            lastSafe = check;
+        }
+
+        lastSafe.setYaw(loc.getYaw());
+        lastSafe.setPitch(loc.getPitch());
+        return lastSafe;
     }
 }

@@ -15,6 +15,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.sql.SQLException;
@@ -34,6 +36,7 @@ public final class Breadmines extends JavaPlugin {
     private ManaManager manaManager;
     private volatile boolean isSystemEnabled = true;
     private BukkitTask asyncTaskHandle;
+    private double manaRegenPerTick = 7.5; // Adjustable for dev testing
 
     @Override
     public void onEnable() {
@@ -99,6 +102,9 @@ public final class Breadmines extends JavaPlugin {
         // Register Skyblock Commands
         getCommand("mana").setExecutor(new ManaCommand(this));
         getCommand("givesword").setExecutor(new GiveSwordCommand());
+        
+        // Register Dev Commands
+        getCommand("manaspeed").setExecutor(this);
 
         // Register Skyblock Event Listeners
         Bukkit.getPluginManager().registerEvents(new AbilityListener(this), this);
@@ -123,13 +129,15 @@ public final class Breadmines extends JavaPlugin {
             for (Player player : Bukkit.getOnlinePlayers()) {
                 double currentMana = manaManager.getMana(player);
                 if (currentMana < 500.0) {
-                    double newMana = Math.min(currentMana + 7.5, 500.0);
+                    double newMana = Math.min(currentMana + manaRegenPerTick, 500.0);
                     manaManager.setMana(player, newMana);
                 }
 
                 String actionBar = buildActionBarHUD(player);
                 Bukkit.getScheduler().runTask(this, () -> {
-                    player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(actionBar));
+                    if (player != null && player.isOnline()) {
+                        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(actionBar));
+                    }
                 });
             }
         }, 0L, 10L);
@@ -138,30 +146,16 @@ public final class Breadmines extends JavaPlugin {
     /**
      * Builds the action bar HUD string with health and mana information.
      * Format: "❤ [Health]/[MaxHealth] ┃ ✎ [Mana]/500"
+     * Health always shown in red, Mana always shown in blue
      */
+    @SuppressWarnings("deprecation")
     private String buildActionBarHUD(Player player) {
         double health = player.getHealth();
         double maxHealth = player.getMaxHealth();
         double mana = manaManager.getMana(player);
 
-        String healthColor;
-        if (health <= maxHealth * 0.25) {
-            healthColor = ChatColor.RED.toString();
-        } else if (health <= maxHealth * 0.5) {
-            healthColor = ChatColor.YELLOW.toString();
-        } else {
-            healthColor = ChatColor.GREEN.toString();
-        }
-
-        String manaColor;
-        if (mana <= 100.0) {
-            manaColor = ChatColor.DARK_AQUA.toString();
-        } else {
-            manaColor = ChatColor.AQUA.toString();
-        }
-
-        return healthColor + "❤ " + String.format("%.1f", health) + "/" + String.format("%.1f", maxHealth) + 
-               ChatColor.GRAY + " ┃ " + manaColor + "✎ " + String.format("%.1f", mana) + "/500";
+        return ChatColor.RED + "❤ " + String.format("%.0f", health) + "/" + String.format("%.0f", maxHealth) + 
+               ChatColor.GRAY + " ┃ " + ChatColor.BLUE + "✎ " + String.format("%.0f", mana) + "/500";
     }
 
     /**
@@ -204,6 +198,43 @@ public final class Breadmines extends JavaPlugin {
     /**
      * Returns the singleton plugin instance.
      */
+    /**
+     * Dev command to adjust mana regeneration speed
+     * Usage: /manaspeed <value>
+     * Example: /manaspeed 15 (sets mana regen to 15 per 10 ticks)
+     */
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (!command.getName().equalsIgnoreCase("manaspeed")) {
+            return false;
+        }
+
+        if (!sender.isOp()) {
+            sender.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
+            return true;
+        }
+
+        if (args.length == 0) {
+            sender.sendMessage(ChatColor.YELLOW + "Current mana regen speed: " + manaRegenPerTick + " per 10 ticks");
+            sender.sendMessage(ChatColor.YELLOW + "Usage: /manaspeed <value>");
+            return true;
+        }
+
+        try {
+            double newSpeed = Double.parseDouble(args[0]);
+            if (newSpeed < 0) {
+                sender.sendMessage(ChatColor.RED + "Mana regen speed must be positive!");
+                return true;
+            }
+            manaRegenPerTick = newSpeed;
+            sender.sendMessage(ChatColor.GREEN + "✓ Mana regen speed set to " + newSpeed + " per 10 ticks");
+            return true;
+        } catch (NumberFormatException e) {
+            sender.sendMessage(ChatColor.RED + "Invalid number: " + args[0]);
+            return true;
+        }
+    }
+
     public static Breadmines getInstance() {
         return instance;
     }

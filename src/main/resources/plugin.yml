@@ -21,6 +21,10 @@ commands:
     description: "Give yourself a custom Necron sword"
     usage: "/givesword <hyperion|astraea|valkyrie|scylla|aotv>"
     permission: breadmines.admin
+  manaspeed:
+    description: "[DEV] Adjust mana regeneration speed"
+    usage: "/manaspeed <value>"
+    permission: op
 
 permissions:
   admin.setup:
