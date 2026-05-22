@@ -24,12 +24,17 @@ public class NecronItemFactory {
         ItemStack sword = new ItemStack(Material.IRON_SWORD, 1);
         ItemMeta meta = sword.getItemMeta();
 
-        meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', "&5Hyperion"));
+        meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', "&d&lHyperion"));
 
         List<String> lore = new ArrayList<>();
-        lore.add(ChatColor.translateAlternateColorCodes('&', "&7Focuses on AoE Magic Damage"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7The legendary blade of the Wither King"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7Focuses on devastating Area of Effect magic"));
         lore.add("");
-        lore.add(ChatColor.translateAlternateColorCodes('&', "&c&l⚔ Ability: Wither Implosion"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&c&l✦ WITHER IMPLOSION"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7Right Click to detonate a burst of"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7wither energy around you, damaging"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7enemies within 5 blocks and applying"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7knockback. Affects nearby allies."));
         lore.add(ChatColor.translateAlternateColorCodes('&', "&8Mana Cost: &b150"));
         lore.add("");
         lore.add(ChatColor.translateAlternateColorCodes('&', "&5&lMYTHIC SWORD"));
@@ -48,12 +53,17 @@ public class NecronItemFactory {
         ItemStack sword = new ItemStack(Material.DIAMOND_SWORD, 1);
         ItemMeta meta = sword.getItemMeta();
 
-        meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', "&5Astraea"));
+        meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', "&d&lAstraea"));
 
         List<String> lore = new ArrayList<>();
-        lore.add(ChatColor.translateAlternateColorCodes('&', "&7Focuses on Tank/Defense"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7The divine protector's blade"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7Channels healing energy for the party"));
         lore.add("");
-        lore.add(ChatColor.translateAlternateColorCodes('&', "&a&l⚔ Ability: Wither Healing"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&a&l✦ WITHER HEALING"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7Right Click to channel restorative"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7power, granting Regeneration II and"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7Absorption II for 5 seconds to you"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7and nearby allies within 5 blocks."));
         lore.add(ChatColor.translateAlternateColorCodes('&', "&8Mana Cost: &b150"));
         lore.add("");
         lore.add(ChatColor.translateAlternateColorCodes('&', "&5&lMYTHIC SWORD"));
@@ -66,19 +76,24 @@ public class NecronItemFactory {
 
     /**
      * Creates the Valkyrie sword - Single-Target DPS focused weapon.
-     * Material: DIAMOND_SWORD | Mana Cost: 150 | Ability: Ferocious Dash (+50% Ferocity Buff)
+     * Material: DIAMOND_SWORD | Mana Cost: 150 | Ability: Ferocious Dash
      */
     public static ItemStack createValkyrie() {
         ItemStack sword = new ItemStack(Material.DIAMOND_SWORD, 1);
         ItemMeta meta = sword.getItemMeta();
 
-        meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', "&5Valkyrie"));
+        meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', "&d&lValkyrie"));
 
         List<String> lore = new ArrayList<>();
-        lore.add(ChatColor.translateAlternateColorCodes('&', "&7Focuses on Single-Target DPS"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7The warrior's blade of strength"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7Imbued with the fury of battle"));
         lore.add("");
-        lore.add(ChatColor.translateAlternateColorCodes('&', "&e&l⚔ Ability: Ferocious Dash"));
-        lore.add(ChatColor.translateAlternateColorCodes('&', "&8(+50% Ferocity Buff)"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&e&l✦ FEROCIOUS DASH"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7Right Click to surge forward with"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7battle lust, granting Strength I"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7for 3 seconds to you and nearby"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7allies within 5 blocks. Deal more"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7damage with each strike!"));
         lore.add(ChatColor.translateAlternateColorCodes('&', "&8Mana Cost: &b150"));
         lore.add("");
         lore.add(ChatColor.translateAlternateColorCodes('&', "&5&lMYTHIC SWORD"));
@@ -97,12 +112,17 @@ public class NecronItemFactory {
         ItemStack sword = new ItemStack(Material.DIAMOND_SWORD, 1);
         ItemMeta meta = sword.getItemMeta();
 
-        meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', "&5Scylla"));
+        meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', "&d&lScylla"));
 
         List<String> lore = new ArrayList<>();
-        lore.add(ChatColor.translateAlternateColorCodes('&', "&7Focuses on Crit/Speed"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7The speedster's weapon"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7Strikes with unparalleled swiftness"));
         lore.add("");
-        lore.add(ChatColor.translateAlternateColorCodes('&', "&6&l⚔ Ability: Wither Swiftness"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&6&l✦ WITHER SWIFTNESS"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7Right Click to channel velocity,"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7granting Speed III for 2.5 seconds"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7to you and nearby allies within"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&75 blocks. Dash across the field!"));
         lore.add(ChatColor.translateAlternateColorCodes('&', "&8Mana Cost: &b150"));
         lore.add("");
         lore.add(ChatColor.translateAlternateColorCodes('&', "&5&lMYTHIC SWORD"));
@@ -115,20 +135,30 @@ public class NecronItemFactory {
 
     /**
      * Creates the Aspect of the Void shovel - Traversal utility item.
-     * Material: DIAMOND_SHOVEL | Mana Cost: 45 | Ability: Ether Transmission (Teleport)
+     * Material: DIAMOND_SHOVEL | Mana Cost: 45/100 | Abilities: Ether Transmission / Ether Warp
      */
     public static ItemStack createAotV() {
         ItemStack shovel = new ItemStack(Material.DIAMOND_SHOVEL, 1);
         ItemMeta meta = shovel.getItemMeta();
 
-        meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', "&5Aspect of the Void"));
+        meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', "&d&lAspect of the Void"));
 
         List<String> lore = new ArrayList<>();
-        lore.add(ChatColor.translateAlternateColorCodes('&', "&7Traversal & Agility Utility"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7The void itself flows through"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7your hands, granting teleportation"));
         lore.add("");
-        lore.add(ChatColor.translateAlternateColorCodes('&', "&d&l⚔ Ability: Ether Transmission"));
-        lore.add(ChatColor.translateAlternateColorCodes('&', "&8(Safe teleport forward)"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&d&l&l✦ ETHER TRANSMISSION"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7Right Click to dash forward up to"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&78 blocks, leaving a trail of void"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7energy in your wake."));
         lore.add(ChatColor.translateAlternateColorCodes('&', "&8Mana Cost: &b45"));
+        lore.add("");
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&d&l&l✦ ETHER WARP"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7Shift + Right Click to target a"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7block up to 60 blocks away and"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7instantly teleport to it. Safe"));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&7landing guaranteed."));
+        lore.add(ChatColor.translateAlternateColorCodes('&', "&8Mana Cost: &b100"));
         lore.add("");
         lore.add(ChatColor.translateAlternateColorCodes('&', "&5&lEPIC SHOVEL"));
 
