@@ -110,6 +110,13 @@ public final class Breadmines extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new AbilityListener(this), this);
         Bukkit.getPluginManager().registerEvents(new JoinListener(this), this);
 
+        // Register Skript Addon (if Skript is installed)
+        try {
+            com.aspectxlol.breadmines.skyblock.skript.BreadminesSkriptAddon.registerSkriptSyntax(this);
+        } catch (Exception e) {
+            getLogger().warning("Skript not found or addon failed to load. Skript integration disabled.");
+        }
+
         // Start Async Mana Regeneration & Action Bar Scheduler
         startAsyncManaRegenerator();
 
@@ -128,8 +135,9 @@ public final class Breadmines extends JavaPlugin {
 
             for (Player player : Bukkit.getOnlinePlayers()) {
                 double currentMana = manaManager.getMana(player);
-                if (currentMana < 500.0) {
-                    double newMana = Math.min(currentMana + manaRegenPerTick, 500.0);
+                double maxMana = manaManager.getMaxMana(player);
+                if (currentMana < maxMana) {
+                    double newMana = Math.min(currentMana + manaRegenPerTick, maxMana);
                     manaManager.setMana(player, newMana);
                 }
 
@@ -145,7 +153,7 @@ public final class Breadmines extends JavaPlugin {
 
     /**
      * Builds the action bar HUD string with health and mana information.
-     * Format: "❤ [Health]/[MaxHealth] ┃ ✎ [Mana]/500"
+     * Format: "❤ [Health]/[MaxHealth] ┃ ✎ [Mana]/[MaxMana]"
      * Health always shown in red, Mana always shown in blue
      */
     @SuppressWarnings("deprecation")
@@ -153,9 +161,10 @@ public final class Breadmines extends JavaPlugin {
         double health = player.getHealth();
         double maxHealth = player.getMaxHealth();
         double mana = manaManager.getMana(player);
+        double maxMana = manaManager.getMaxMana(player);
 
         return ChatColor.RED + "❤ " + String.format("%.0f", health) + "/" + String.format("%.0f", maxHealth) + 
-               ChatColor.GRAY + " ┃ " + ChatColor.BLUE + "✎ " + String.format("%.0f", mana) + "/500";
+               ChatColor.GRAY + " ┃ " + ChatColor.BLUE + "✎ " + String.format("%.0f", mana) + "/" + String.format("%.0f", maxMana);
     }
 
     /**
