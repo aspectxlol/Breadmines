@@ -173,29 +173,8 @@ public class AbilityListener implements Listener {
         var world = playerLoc.getWorld();
         if (world == null) return;
 
-        // Damage entities in 5-block radius
-        for (Entity entity : player.getNearbyEntities(5.0, 5.0, 5.0)) {
-            if (entity == null || !(entity instanceof LivingEntity) || entity == player) {
-                continue;
-            }
-
-            LivingEntity living = (LivingEntity) entity;
-            living.damage(24.0);
-            
-            // Simulate vanilla TNT knockback mechanics for players
-            if (entity instanceof Player) {
-                org.bukkit.util.Vector knockback = entity.getLocation().toVector().subtract(playerLoc.toVector());
-                if (knockback.lengthSquared() > 0) {
-                    knockback = knockback.normalize().multiply(1.5).setY(0.4);
-                    entity.setVelocity(knockback);
-                }
-            }
-        }
-
-        // Effects
-        world.spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
-        world.spawnParticle(Particle.EXPLOSION, playerLoc, 15, 1.5, 1.5, 1.5, 0.1);
-        world.playSound(playerLoc, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
+        // Create explosion at player location
+        world.createExplosion(playerLoc.getX(), playerLoc.getY(), playerLoc.getZ(), 3.5f, false, false);
     }
 
     /**

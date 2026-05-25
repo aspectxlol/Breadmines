@@ -2,6 +2,8 @@ package com.aspectxlol.breadmines.skyblock.factory;
 
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import java.util.ArrayList;
@@ -15,6 +17,27 @@ import java.util.List;
  * keeping memory footprint minimal and improving cache locality.
  */
 public class NecronItemFactory {
+
+    /**
+     * Applies unbreakable flag and netherite-level melee damage to an item.
+     * Netherite damage: 8 (base sword damage).
+     */
+    private static void applyNecronAttributes(ItemStack item) {
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) return;
+
+        // Set unbreakable
+        meta.setUnbreakable(true);
+
+        // Add netherite-level attack damage (8 damage)
+        AttributeModifier damageModifier = new AttributeModifier(
+                "Necron Damage",
+                8.0,
+                AttributeModifier.Operation.ADD_NUMBER);
+        meta.addAttributeModifier(Attribute.ATTACK_DAMAGE, damageModifier);
+
+        item.setItemMeta(meta);
+    }
 
     /**
      * Creates the Hyperion sword - AoE Magic Damage focused weapon.
@@ -41,6 +64,7 @@ public class NecronItemFactory {
 
         meta.setLore(lore);
         sword.setItemMeta(meta);
+        applyNecronAttributes(sword);
 
         return sword;
     }
@@ -70,6 +94,7 @@ public class NecronItemFactory {
 
         meta.setLore(lore);
         sword.setItemMeta(meta);
+        applyNecronAttributes(sword);
 
         return sword;
     }
@@ -100,6 +125,7 @@ public class NecronItemFactory {
 
         meta.setLore(lore);
         sword.setItemMeta(meta);
+        applyNecronAttributes(sword);
 
         return sword;
     }
@@ -129,6 +155,7 @@ public class NecronItemFactory {
 
         meta.setLore(lore);
         sword.setItemMeta(meta);
+        applyNecronAttributes(sword);
 
         return sword;
     }
@@ -164,6 +191,7 @@ public class NecronItemFactory {
 
         meta.setLore(lore);
         shovel.setItemMeta(meta);
+        applyNecronAttributes(shovel);
 
         return shovel;
     }
