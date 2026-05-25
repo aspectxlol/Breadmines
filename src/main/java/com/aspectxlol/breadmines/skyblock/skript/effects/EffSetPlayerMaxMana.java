@@ -33,6 +33,7 @@ public class EffSetPlayerMaxMana extends Effect {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern, Kleenean isDelayed, SkriptParser.ParseResult parseResult) {
         this.playerExpr = (Expression<Player>) exprs[0];
         this.maxManaExpr = (Expression<Number>) exprs[1];
@@ -42,7 +43,6 @@ public class EffSetPlayerMaxMana extends Effect {
     @Override
     protected void execute(Event event) {
         Breadmines plugin = Breadmines.getPlugin(Breadmines.class);
-        if (plugin == null) return;
 
         for (Player player : playerExpr.getAll(event)) {
             if (player == null) continue;

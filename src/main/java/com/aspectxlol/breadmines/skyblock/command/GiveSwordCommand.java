@@ -1,6 +1,7 @@
 package com.aspectxlol.breadmines.skyblock.command;
 
 import com.aspectxlol.breadmines.skyblock.factory.NecronItemFactory;
+import com.aspectxlol.breadmines.util.CommandUtils;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -16,19 +17,10 @@ public class GiveSwordCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        // Only allow operators to use this command
-        if (!sender.isOp()) {
-            sender.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
-            return true;
-        }
+        if (!CommandUtils.requireOp(sender)) return true;
 
-        // Command must be used by a player
-        if (!(sender instanceof Player)) {
-            sender.sendMessage(ChatColor.RED + "This command can only be used by players.");
-            return true;
-        }
-
-        Player player = (Player) sender;
+        Player player = CommandUtils.requirePlayer(sender);
+        if (player == null) return true;
 
         // Check for arguments
         if (args.length == 0) {

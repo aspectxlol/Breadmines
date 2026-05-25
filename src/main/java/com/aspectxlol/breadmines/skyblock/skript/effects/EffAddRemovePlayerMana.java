@@ -40,6 +40,7 @@ public class EffAddRemovePlayerMana extends Effect {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern, Kleenean isDelayed, SkriptParser.ParseResult parseResult) {
         this.manaExpr = (Expression<Number>) exprs[0];
         this.playerExpr = (Expression<Player>) exprs[1];
@@ -50,7 +51,6 @@ public class EffAddRemovePlayerMana extends Effect {
     @Override
     protected void execute(Event event) {
         Breadmines plugin = Breadmines.getPlugin(Breadmines.class);
-        if (plugin == null) return;
 
         Number manaAmount = manaExpr.getSingle(event);
         if (manaAmount == null) return;

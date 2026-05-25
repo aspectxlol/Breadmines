@@ -1,6 +1,7 @@
 package com.aspectxlol.breadmines.skyblock.command;
 
 import com.aspectxlol.breadmines.Breadmines;
+import com.aspectxlol.breadmines.util.CommandUtils;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -20,11 +21,7 @@ public class ManaCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        // Only allow operators to use this command
-        if (!sender.isOp()) {
-            sender.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
-            return true;
-        }
+        if (!CommandUtils.requireOp(sender)) return true;
 
         // Check for arguments
         if (args.length == 0) {

@@ -5,10 +5,12 @@ import com.aspectxlol.breadmines.drops.command.DropCommandHandler;
 import com.aspectxlol.breadmines.drops.command.DropTabCompleter;
 import com.aspectxlol.breadmines.drops.listener.DropBlockListener;
 import com.aspectxlol.breadmines.skyblock.command.GiveSwordCommand;
+import com.aspectxlol.breadmines.skyblock.command.GiveSwordTabCompleter;
 import com.aspectxlol.breadmines.skyblock.command.ManaCommand;
 import com.aspectxlol.breadmines.skyblock.listener.AbilityListener;
 import com.aspectxlol.breadmines.skyblock.listener.JoinListener;
 import com.aspectxlol.breadmines.skyblock.manager.ManaManager;
+import com.aspectxlol.breadmines.util.CommandUtils;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
@@ -102,6 +104,7 @@ public final class Breadmines extends JavaPlugin {
         // Register Skyblock Commands
         getCommand("mana").setExecutor(new ManaCommand(this));
         getCommand("givesword").setExecutor(new GiveSwordCommand());
+        getCommand("givesword").setTabCompleter(new GiveSwordTabCompleter());
         
         // Register Dev Commands
         getCommand("manaspeed").setExecutor(this);
@@ -218,10 +221,7 @@ public final class Breadmines extends JavaPlugin {
             return false;
         }
 
-        if (!sender.isOp()) {
-            sender.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
-            return true;
-        }
+        if (!CommandUtils.requireOp(sender)) return true;
 
         if (args.length == 0) {
             sender.sendMessage(ChatColor.YELLOW + "Current mana regen speed: " + manaRegenPerTick + " per 10 ticks");

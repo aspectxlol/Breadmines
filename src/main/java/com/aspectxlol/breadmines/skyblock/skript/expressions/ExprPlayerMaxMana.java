@@ -1,6 +1,5 @@
 package com.aspectxlol.breadmines.skyblock.skript.expressions;
 
-import ch.njol.skript.Skript;
 import ch.njol.skript.doc.Description;
 import ch.njol.skript.doc.Examples;
 import ch.njol.skript.doc.Name;
@@ -28,7 +27,6 @@ public class ExprPlayerMaxMana extends SimplePropertyExpression<Player, Number> 
     @Override
     public Number convert(Player player) {
         Breadmines plugin = Breadmines.getPlugin(Breadmines.class);
-        if (plugin == null) return 500.0;
         return plugin.getManaManager().getMaxMana(player);
     }
 

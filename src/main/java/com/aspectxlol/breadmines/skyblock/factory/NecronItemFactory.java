@@ -2,8 +2,10 @@ package com.aspectxlol.breadmines.skyblock.factory;
 
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
+import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import java.util.ArrayList;
@@ -31,9 +33,10 @@ public class NecronItemFactory {
 
         // Add netherite-level attack damage (8 damage)
         AttributeModifier damageModifier = new AttributeModifier(
-                "Necron Damage",
-                8.0,
-                AttributeModifier.Operation.ADD_NUMBER);
+            NamespacedKey.minecraft("necron_damage"),
+            8.0,
+            AttributeModifier.Operation.ADD_NUMBER,
+            EquipmentSlotGroup.MAINHAND);
         meta.addAttributeModifier(Attribute.ATTACK_DAMAGE, damageModifier);
 
         item.setItemMeta(meta);

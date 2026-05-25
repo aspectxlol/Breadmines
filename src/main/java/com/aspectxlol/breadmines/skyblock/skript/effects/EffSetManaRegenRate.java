@@ -37,6 +37,7 @@ public class EffSetManaRegenRate extends Effect {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public boolean init(Expression<?>[] exprs, int matchedPattern, Kleenean isDelayed, SkriptParser.ParseResult parseResult) {
         this.playerExpr = (Expression<Player>) exprs[0];
         this.regenExpr = (Expression<Number>) exprs[1];
@@ -47,7 +48,6 @@ public class EffSetManaRegenRate extends Effect {
     @Override
     protected void execute(Event event) {
         Breadmines plugin = Breadmines.getPlugin(Breadmines.class);
-        if (plugin == null) return;
 
         Number regenAmount = regenExpr.getSingle(event);
         if (regenAmount == null) return;

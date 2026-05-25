@@ -2,6 +2,7 @@ package com.aspectxlol.breadmines.skyblock.listener;
 
 import com.aspectxlol.breadmines.Breadmines;
 import com.aspectxlol.breadmines.skyblock.manager.ManaManager;
+import com.aspectxlol.breadmines.skyblock.util.AbilityUtils;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -9,7 +10,6 @@ import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.block.Block;
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -19,8 +19,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.entity.Entity;
 
 /**
  * AbilityListener - Handles right-click ability triggers for custom Necron items.
@@ -41,8 +39,6 @@ public class AbilityListener implements Listener {
 
     private final Breadmines plugin;
     private final ManaManager manaManager;
-    private BukkitTask etherwarpPreviewTask;
-
     public AbilityListener(Breadmines plugin) {
         this.plugin = plugin;
         this.manaManager = plugin.getManaManager();
@@ -53,7 +49,7 @@ public class AbilityListener implements Listener {
      * Starts a repeating task that shows preview particles for Etherwarp when player shifts.
      */
     private void startEtherwarpPreviewTask() {
-        etherwarpPreviewTask = new BukkitRunnable() {
+        new BukkitRunnable() {
             @Override
             public void run() {
                 if (!plugin.isSystemEnabled()) {
@@ -164,10 +160,7 @@ public class AbilityListener implements Listener {
      * Mana Cost: 150
      */
     private void handleHyperion(Player player, PlayerInteractEvent event) {
-        if (!manaManager.deductMana(player, 150.0)) {
-            player.sendMessage(ChatColor.RED + "✗ Insufficient mana (need 150)");
-            return;
-        }
+        if (!AbilityUtils.tryConsumeMana(player, manaManager, 150.0)) return;
 
         Location playerLoc = player.getLocation().clone();
         var world = playerLoc.getWorld();
@@ -184,10 +177,7 @@ public class AbilityListener implements Listener {
      * Mana Cost: 150
      */
     private void handleAstraea(Player player, PlayerInteractEvent event) {
-        if (!manaManager.deductMana(player, 150.0)) {
-            player.sendMessage(ChatColor.RED + "✗ Insufficient mana (need 150)");
-            return;
-        }
+        if (!AbilityUtils.tryConsumeMana(player, manaManager, 150.0)) return;
 
         Location playerLoc = player.getLocation().clone();
         var world = playerLoc.getWorld();
@@ -196,17 +186,7 @@ public class AbilityListener implements Listener {
         // Apply Regeneration and Absorption for 5 seconds (100 ticks)
         PotionEffect regen = new PotionEffect(PotionEffectType.REGENERATION, 100, 1, true, false);
         PotionEffect absorption = new PotionEffect(PotionEffectType.ABSORPTION, 100, 1, true, false);
-        player.addPotionEffect(regen);
-        player.addPotionEffect(absorption);
-
-        // Apply to nearby players as well
-        for (Entity entity : player.getNearbyEntities(5.0, 5.0, 5.0)) {
-            if (entity == null || !(entity instanceof Player) || entity == player) {
-                continue;
-            }
-            ((Player) entity).addPotionEffect(regen);
-            ((Player) entity).addPotionEffect(absorption);
-        }
+        AbilityUtils.applyPotionEffects(player, 5.0, regen, absorption);
 
         // Effects
         world.spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
@@ -222,10 +202,7 @@ public class AbilityListener implements Listener {
      * Mana Cost: 150
      */
     private void handleValkyrie(Player player, PlayerInteractEvent event) {
-        if (!manaManager.deductMana(player, 150.0)) {
-            player.sendMessage(ChatColor.RED + "✗ Insufficient mana (need 150)");
-            return;
-        }
+        if (!AbilityUtils.tryConsumeMana(player, manaManager, 150.0)) return;
 
         Location playerLoc = player.getLocation().clone();
         var world = playerLoc.getWorld();
@@ -233,15 +210,7 @@ public class AbilityListener implements Listener {
 
         // Apply Strength I for 3 seconds (60 ticks)
         PotionEffect strength = new PotionEffect(PotionEffectType.STRENGTH, 60, 0, true, false);
-        player.addPotionEffect(strength);
-
-        // Apply to nearby players as well
-        for (Entity entity : player.getNearbyEntities(5.0, 5.0, 5.0)) {
-            if (entity == null || !(entity instanceof Player) || entity == player) {
-                continue;
-            }
-            ((Player) entity).addPotionEffect(strength);
-        }
+        AbilityUtils.applyPotionEffects(player, 5.0, strength);
 
         // Effects
         world.spawnParticle(Particle.CRIT, playerLoc, 25, 1.0, 1.0, 1.0, 0.3);
@@ -255,10 +224,7 @@ public class AbilityListener implements Listener {
      * Mana Cost: 150
      */
     private void handleScylla(Player player, PlayerInteractEvent event) {
-        if (!manaManager.deductMana(player, 150.0)) {
-            player.sendMessage(ChatColor.RED + "✗ Insufficient mana (need 150)");
-            return;
-        }
+        if (!AbilityUtils.tryConsumeMana(player, manaManager, 150.0)) return;
 
         Location playerLoc = player.getLocation().clone();
         var world = playerLoc.getWorld();
@@ -266,15 +232,7 @@ public class AbilityListener implements Listener {
 
         // Apply Speed III for 2.5 seconds (50 ticks)
         PotionEffect speed = new PotionEffect(PotionEffectType.SPEED, 50, 2, true, false);
-        player.addPotionEffect(speed);
-
-        // Apply to nearby players as well
-        for (Entity entity : player.getNearbyEntities(5.0, 5.0, 5.0)) {
-            if (entity == null || !(entity instanceof Player) || entity == player) {
-                continue;
-            }
-            ((Player) entity).addPotionEffect(speed);
-        }
+        AbilityUtils.applyPotionEffects(player, 5.0, speed);
 
         // Effects
         world.spawnParticle(Particle.LARGE_SMOKE, playerLoc, 20, 2.0, 2.0, 2.0, 0.1);
@@ -313,10 +271,7 @@ public class AbilityListener implements Listener {
      * Mana Cost: 45
      */
     private void handleTransmission(Player player, PlayerInteractEvent event) {
-        if (!manaManager.deductMana(player, 45.0)) {
-            player.sendMessage(ChatColor.RED + "✗ Insufficient mana (need 45)");
-            return;
-        }
+        if (!AbilityUtils.tryConsumeMana(player, manaManager, 45.0)) return;
 
         Location playerLoc = player.getLocation().clone();
         Location teleportLoc = calculateTeleportLocation(player, 8.0);
@@ -344,10 +299,7 @@ public class AbilityListener implements Listener {
      * Mana Cost: 100
      */
     private void handleEtherWarp(Player player, PlayerInteractEvent event) {
-        if (!manaManager.deductMana(player, 100.0)) {
-            player.sendMessage(ChatColor.RED + "✗ Insufficient mana (need 100)");
-            return;
-        }
+        if (!AbilityUtils.tryConsumeMana(player, manaManager, 100.0)) return;
 
         Location playerLoc = player.getLocation().clone();
         Block targetBlock = player.getTargetBlockExact(60, FluidCollisionMode.NEVER);
