@@ -132,8 +132,6 @@ public final class RegistryMenu {
         inventory.setItem(21, createButton(Material.PLAYER_HEAD, ChatColor.WHITE + "Player Heads", ChatColor.GRAY + "Filter player head items"));
         inventory.setItem(22, createButton(Material.PAPER, ChatColor.GREEN + "All Items", ChatColor.GRAY + "Show everything"));
         inventory.setItem(23, createButton(Material.BOOK, ChatColor.YELLOW + "Items Only", ChatColor.GRAY + "Filter non-weapon, non-armor, non-head items"));
-        inventory.setItem(24, createButton(Material.RAW_IRON, ChatColor.AQUA + "Uncompressed Resource", ChatColor.GRAY + "Filter keys starting with uncompressed_"));
-        inventory.setItem(25, createButton(Material.IRON_INGOT, ChatColor.AQUA + "Compressed Resource", ChatColor.GRAY + "Filter keys starting with compressed"));
         inventory.setItem(29, createButton(Material.NAME_TAG, ChatColor.YELLOW + "Name A-Z", ChatColor.GRAY + "Sort by name ascending"));
         inventory.setItem(30, createButton(Material.NAME_TAG, ChatColor.YELLOW + "Name Z-A", ChatColor.GRAY + "Sort by name descending"));
         inventory.setItem(31, createButton(Material.PAPER, ChatColor.AQUA + "Type A-Z", ChatColor.GRAY + "Sort by item type ascending"));

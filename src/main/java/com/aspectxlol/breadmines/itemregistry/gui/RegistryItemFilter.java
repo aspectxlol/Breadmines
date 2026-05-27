@@ -52,28 +52,6 @@ public enum RegistryItemFilter {
         public boolean matches(ItemStack itemStack) {
             return itemStack != null && !WEAPON.matches(itemStack) && !ARMOR.matches(itemStack) && !PLAYER_HEAD.matches(itemStack);
         }
-    },
-    UNCOMPRESSED_RESOURCE("Uncompressed Resource") {
-        @Override
-        public boolean matches(ItemStack itemStack) {
-            return false;
-        }
-
-        @Override
-        public boolean matches(CustomItemDefinition definition) {
-            return definition != null && definition.getId().startsWith("uncompressed_");
-        }
-    },
-    COMPRESSED_RESOURCE("Compressed Resource") {
-        @Override
-        public boolean matches(ItemStack itemStack) {
-            return false;
-        }
-
-        @Override
-        public boolean matches(CustomItemDefinition definition) {
-            return definition != null && definition.getId().startsWith("compressed");
-        }
     };
 
     private final String displayName;

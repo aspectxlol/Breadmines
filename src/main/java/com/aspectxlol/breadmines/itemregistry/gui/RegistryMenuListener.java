@@ -133,16 +133,6 @@ public class RegistryMenuListener implements Listener {
             return;
         }
 
-        if (rawSlot == 24) {
-            menu.open(player, 1, RegistryItemFilter.UNCOMPRESSED_RESOURCE, holder.getSortMode());
-            return;
-        }
-
-        if (rawSlot == 25) {
-            menu.open(player, 1, RegistryItemFilter.COMPRESSED_RESOURCE, holder.getSortMode());
-            return;
-        }
-
         if (rawSlot == 29) {
             menu.open(player, 1, holder.getFilter(), RegistrySortMode.NAME_ASC);
             return;
