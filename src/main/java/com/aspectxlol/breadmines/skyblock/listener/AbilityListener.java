@@ -166,8 +166,8 @@ public class AbilityListener implements Listener {
         var world = playerLoc.getWorld();
         if (world == null) return;
 
-        // Create explosion at player location
-        world.createExplosion(playerLoc.getX(), playerLoc.getY(), playerLoc.getZ(), 3.5f, false, false);
+        // Create explosion at player location (exclude the player as source)
+        world.createExplosion(playerLoc, 3.5f, false, false, player);
     }
 
     /**
