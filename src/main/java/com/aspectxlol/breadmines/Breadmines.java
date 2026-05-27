@@ -4,6 +4,12 @@ import com.aspectxlol.breadmines.drops.DropSystemHandler;
 import com.aspectxlol.breadmines.drops.command.DropCommandHandler;
 import com.aspectxlol.breadmines.drops.command.DropTabCompleter;
 import com.aspectxlol.breadmines.drops.listener.DropBlockListener;
+import com.aspectxlol.breadmines.itemregistry.CustomItemRegistry;
+import com.aspectxlol.breadmines.itemregistry.CustomItemRegistryApi;
+import com.aspectxlol.breadmines.itemregistry.command.RegistryCommand;
+import com.aspectxlol.breadmines.itemregistry.gui.RegistryMenuListener;
+import com.aspectxlol.breadmines.skyblock.enchantments.SkyblockEnchantmentApi;
+import com.aspectxlol.breadmines.skyblock.enchantments.SkyblockEnchantmentManager;
 import com.aspectxlol.breadmines.skyblock.command.GiveSwordCommand;
 import com.aspectxlol.breadmines.skyblock.command.GiveSwordTabCompleter;
 import com.aspectxlol.breadmines.skyblock.command.ManaCommand;
@@ -19,6 +25,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.plugin.ServicePriority;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.sql.SQLException;
@@ -35,6 +42,8 @@ public final class Breadmines extends JavaPlugin {
 
     private static Breadmines instance;
     private DropSystemHandler dropHandler;
+    private CustomItemRegistry customItemRegistry;
+    private SkyblockEnchantmentManager skyblockEnchantmentManager;
     private ManaManager manaManager;
     private volatile boolean isSystemEnabled = true;
     private BukkitTask asyncTaskHandle;
@@ -60,6 +69,10 @@ public final class Breadmines extends JavaPlugin {
         // Stop async tasks
         if (asyncTaskHandle != null) {
             asyncTaskHandle.cancel();
+        }
+
+        if (customItemRegistry != null) {
+            customItemRegistry.save();
         }
 
         // Close database connection
@@ -100,6 +113,10 @@ public final class Breadmines extends JavaPlugin {
      */
     private void initializeSkyblockSystem() {
         manaManager = new ManaManager();
+        skyblockEnchantmentManager = new SkyblockEnchantmentManager(this);
+        getServer().getServicesManager().register(SkyblockEnchantmentApi.class, skyblockEnchantmentManager, this, ServicePriority.Normal);
+
+        initializeItemRegistry();
 
         // Register Skyblock Commands
         getCommand("mana").setExecutor(new ManaCommand(this));
@@ -121,9 +138,39 @@ public final class Breadmines extends JavaPlugin {
         }
 
         // Start Async Mana Regeneration & Action Bar Scheduler
+        startSkyblockStatUpdater();
         startAsyncManaRegenerator();
 
         getLogger().info(ChatColor.GREEN + "✓ Breadmines Skyblock system initialized!");
+    }
+
+    /**
+     * Initializes the custom item registry service and command surface.
+     */
+    private void initializeItemRegistry() {
+        customItemRegistry = new CustomItemRegistry(this);
+        getServer().getServicesManager().register(CustomItemRegistryApi.class, customItemRegistry, this, ServicePriority.Normal);
+
+        RegistryCommand registryCommand = new RegistryCommand(this);
+        getCommand("registry").setExecutor(registryCommand);
+        getCommand("registry").setTabCompleter(registryCommand);
+
+        Bukkit.getPluginManager().registerEvents(new RegistryMenuListener(this), this);
+
+        getLogger().info(ChatColor.GREEN + "✓ Custom item registry initialized!");
+    }
+
+    /**
+     * Updates player mana-related stats from enchantments on the main thread.
+     */
+    private void startSkyblockStatUpdater() {
+        Bukkit.getScheduler().runTaskTimer(this, () -> {
+            if (!isSystemEnabled || skyblockEnchantmentManager == null || manaManager == null) {
+                return;
+            }
+
+            skyblockEnchantmentManager.refreshAllOnlinePlayers(getBaseManaRegenPerSecond());
+        }, 0L, 20L);
     }
 
     /**
@@ -205,6 +252,34 @@ public final class Breadmines extends JavaPlugin {
      */
     public DropSystemHandler getDropHandler() {
         return dropHandler;
+    }
+
+    /**
+     * Returns the custom item registry implementation.
+     */
+    public CustomItemRegistry getCustomItemRegistry() {
+        return customItemRegistry;
+    }
+
+    /**
+     * Returns the skyblock enchantment manager implementation.
+     */
+    public SkyblockEnchantmentManager getSkyblockEnchantmentManager() {
+        return skyblockEnchantmentManager;
+    }
+
+    /**
+     * Returns the enchantment API for other plugins.
+     */
+    public SkyblockEnchantmentApi getSkyblockEnchantmentApi() {
+        return skyblockEnchantmentManager;
+    }
+
+    /**
+     * Returns the base mana regeneration rate in mana per second.
+     */
+    public double getBaseManaRegenPerSecond() {
+        return manaRegenPerTick * 2.0;
     }
 
     /**

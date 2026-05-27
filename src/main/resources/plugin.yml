@@ -25,6 +25,11 @@ commands:
     description: "[DEV] Adjust mana regeneration speed"
     usage: "/manaspeed <value>"
     permission: op
+  registry:
+    description: "Manage the custom item registry"
+    usage: "/registry <add|get|remove|delete|list> ..."
+    permission: breadmines.registry
+    aliases: [itemregistry, itemreg, reg]
 
 permissions:
   admin.setup:
@@ -32,4 +37,7 @@ permissions:
     default: op
   breadmines.admin:
     description: "Permission to use Breadmines Skyblock admin commands"
+    default: op
+  breadmines.registry:
+    description: "Permission to manage the custom item registry"
     default: op
