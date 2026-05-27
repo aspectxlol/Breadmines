@@ -22,7 +22,7 @@ import java.util.Locale;
 
 public class RegistryCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> ROOT_SUBCOMMANDS = Arrays.asList("add", "register", "store", "lazyadd", "lazy", "get", "give", "remove", "delete", "rm", "del", "list", "ls", "show");
+    private static final List<String> ROOT_SUBCOMMANDS = Arrays.asList("add", "register", "store", "lazyadd", "lazy", "get", "give", "remove", "delete", "rm", "del", "list", "ls", "show", "search", "find", "query");
 
     private final Breadmines plugin;
     private final CustomItemRegistry registry;
@@ -66,6 +66,10 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
             case "ls":
             case "show":
                 return handleList(sender);
+            case "search":
+            case "find":
+            case "query":
+                return handleSearch(sender, label, args);
             default:
                 sender.sendMessage(ChatColor.RED + "Unknown subcommand: " + args[0]);
                 sendUsage(sender, label);
@@ -182,9 +186,27 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean handleSearch(CommandSender sender, String label, String[] args) {
+        Player player = CommandUtils.requirePlayer(sender);
+        if (player == null) {
+            return true;
+        }
+
+        if (args.length < 2) {
+            sender.sendMessage(ChatColor.YELLOW + "Usage: /" + label + " search <terms>");
+            return true;
+        }
+
+        String query = joinArgs(args, 1);
+        menu.open(player, 1, com.aspectxlol.breadmines.itemregistry.gui.RegistryItemFilter.ALL, com.aspectxlol.breadmines.itemregistry.gui.RegistrySortMode.NAME_ASC, query);
+        sender.sendMessage(ChatColor.GREEN + "Opened search results for " + ChatColor.AQUA + query + ChatColor.GREEN + ".");
+        return true;
+    }
+
     private void sendUsage(CommandSender sender, String label) {
-        sender.sendMessage(ChatColor.YELLOW + "Usage: /" + label + " <add|lazyadd|get|remove|delete|list> ...");
-        sender.sendMessage(ChatColor.GRAY + "Add uses an explicit name. Lazyadd uses the held item's display name. Aliases: /" + label + " register, store, lazy, give, delete, rm, del, ls, show");
+        sender.sendMessage(ChatColor.YELLOW + "Usage: /" + label + " <add|lazyadd|get|remove|delete|list|search> ...");
+        sender.sendMessage(ChatColor.GRAY + "Add uses an explicit name. Lazyadd uses the held item's display name. Search ranks exact and partial matches across item id, name, type, and lore.");
+        sender.sendMessage(ChatColor.GRAY + "Aliases: /" + label + " register, store, lazy, give, delete, rm, del, ls, show, find, query");
     }
 
     private List<String> filterByPrefix(String prefix, Collection<String> values) {

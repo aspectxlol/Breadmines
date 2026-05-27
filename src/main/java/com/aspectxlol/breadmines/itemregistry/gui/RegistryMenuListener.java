@@ -46,27 +46,27 @@ public class RegistryMenuListener implements Listener {
         }
 
         if (rawSlot == 46) {
-            menu.openControls(player, currentPage, holder.getFilter(), holder.getSortMode());
+            menu.openControls(player, currentPage, holder.getFilter(), holder.getSortMode(), holder.getSearchQuery());
             return;
         }
 
         if (rawSlot == 47) {
-            menu.open(player, 1, holder.getFilter(), holder.getSortMode().next());
+            menu.open(player, 1, holder.getFilter(), holder.getSortMode().next(), holder.getSearchQuery());
             return;
         }
 
         if (rawSlot == 48) {
-            menu.open(player, 1, holder.getFilter().next(), holder.getSortMode());
+            menu.open(player, 1, holder.getFilter().next(), holder.getSortMode(), holder.getSearchQuery());
             return;
         }
 
         if (rawSlot == 50) {
-            menu.open(player, 1, RegistryItemFilter.ALL, RegistrySortMode.NAME_ASC);
+            menu.open(player, 1, RegistryItemFilter.ALL, RegistrySortMode.NAME_ASC, null);
             return;
         }
 
         if (rawSlot == 53 && currentPage < totalPages) {
-            menu.open(player, currentPage + 1, holder.getFilter(), holder.getSortMode());
+            menu.open(player, currentPage + 1, holder.getFilter(), holder.getSortMode(), holder.getSearchQuery());
             return;
         }
 
@@ -79,7 +79,7 @@ public class RegistryMenuListener implements Listener {
             return;
         }
 
-        CustomItemDefinition definition = menu.getDefinitionAt(currentPage, rawSlot, holder.getFilter(), holder.getSortMode());
+        CustomItemDefinition definition = menu.getDefinitionAt(currentPage, rawSlot, holder.getFilter(), holder.getSortMode(), holder.getSearchQuery());
         if (definition == null) {
             return;
         }
@@ -104,67 +104,67 @@ public class RegistryMenuListener implements Listener {
         int currentPage = holder.getPage();
 
         if (rawSlot == 45) {
-            menu.open(player, currentPage, holder.getFilter(), holder.getSortMode());
+            menu.open(player, currentPage, holder.getFilter(), holder.getSortMode(), holder.getSearchQuery());
             return;
         }
 
         if (rawSlot == 19) {
-            menu.open(player, 1, RegistryItemFilter.WEAPON, holder.getSortMode());
+            menu.open(player, 1, RegistryItemFilter.WEAPON, holder.getSortMode(), holder.getSearchQuery());
             return;
         }
 
         if (rawSlot == 20) {
-            menu.open(player, 1, RegistryItemFilter.ARMOR, holder.getSortMode());
+            menu.open(player, 1, RegistryItemFilter.ARMOR, holder.getSortMode(), holder.getSearchQuery());
             return;
         }
 
         if (rawSlot == 21) {
-            menu.open(player, 1, RegistryItemFilter.PLAYER_HEAD, holder.getSortMode());
+            menu.open(player, 1, RegistryItemFilter.PLAYER_HEAD, holder.getSortMode(), holder.getSearchQuery());
             return;
         }
 
         if (rawSlot == 22) {
-            menu.open(player, 1, RegistryItemFilter.ALL, holder.getSortMode());
+            menu.open(player, 1, RegistryItemFilter.ALL, holder.getSortMode(), holder.getSearchQuery());
             return;
         }
 
         if (rawSlot == 23) {
-            menu.open(player, 1, RegistryItemFilter.ITEM, holder.getSortMode());
+            menu.open(player, 1, RegistryItemFilter.ITEM, holder.getSortMode(), holder.getSearchQuery());
             return;
         }
 
         if (rawSlot == 29) {
-            menu.open(player, 1, holder.getFilter(), RegistrySortMode.NAME_ASC);
+            menu.open(player, 1, holder.getFilter(), RegistrySortMode.NAME_ASC, holder.getSearchQuery());
             return;
         }
 
         if (rawSlot == 30) {
-            menu.open(player, 1, holder.getFilter(), RegistrySortMode.NAME_DESC);
+            menu.open(player, 1, holder.getFilter(), RegistrySortMode.NAME_DESC, holder.getSearchQuery());
             return;
         }
 
         if (rawSlot == 31) {
-            menu.open(player, 1, holder.getFilter(), RegistrySortMode.TYPE_ASC);
+            menu.open(player, 1, holder.getFilter(), RegistrySortMode.TYPE_ASC, holder.getSearchQuery());
             return;
         }
 
         if (rawSlot == 32) {
-            menu.open(player, 1, holder.getFilter(), RegistrySortMode.TYPE_DESC);
+            menu.open(player, 1, holder.getFilter(), RegistrySortMode.TYPE_DESC, holder.getSearchQuery());
             return;
         }
 
         if (rawSlot == 33) {
-            menu.open(player, 1, holder.getFilter(), RegistrySortMode.NEWEST);
+            menu.open(player, 1, holder.getFilter(), RegistrySortMode.NEWEST, holder.getSearchQuery());
             return;
         }
 
         if (rawSlot == 34) {
-            menu.open(player, 1, holder.getFilter(), RegistrySortMode.OLDEST);
+            menu.open(player, 1, holder.getFilter(), RegistrySortMode.OLDEST, holder.getSearchQuery());
             return;
         }
 
         if (rawSlot == 49) {
-            menu.open(player, currentPage, holder.getFilter(), holder.getSortMode());
+            menu.open(player, currentPage, holder.getFilter(), holder.getSortMode(), holder.getSearchQuery());
             return;
         }
 
@@ -174,7 +174,7 @@ public class RegistryMenuListener implements Listener {
         }
 
         if (rawSlot == 53) {
-            menu.open(player, currentPage, holder.getFilter(), holder.getSortMode());
+            menu.open(player, currentPage, holder.getFilter(), holder.getSortMode(), holder.getSearchQuery());
         }
     }
 }
