@@ -19,8 +19,10 @@ import org.bukkit.event.player.PlayerQuitEvent;
 public class JoinListener implements Listener {
 
     private final ManaManager manaManager;
+    private final Breadmines plugin;
 
     public JoinListener(Breadmines plugin) {
+        this.plugin = plugin;
         this.manaManager = plugin.getManaManager();
     }
 
@@ -32,6 +34,9 @@ public class JoinListener implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         manaManager.initializePlayerMana(player);
+        if (plugin.getSkyblockEnchantmentManager() != null) {
+            plugin.getSkyblockEnchantmentManager().refreshPlayerStats(player, plugin.getBaseManaRegenPerSecond());
+        }
     }
 
     /**
