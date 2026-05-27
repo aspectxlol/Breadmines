@@ -54,6 +54,11 @@ public final class Breadmines extends JavaPlugin {
     public void onEnable() {
         instance = this;
 
+        // Initialize shared item registry first so other systems can depend on it.
+        if (!initializeItemRegistry()) {
+            return;
+        }
+
         // Initialize Drop System
         initializeDropSystem();
 
@@ -93,7 +98,7 @@ public final class Breadmines extends JavaPlugin {
      */
     private void initializeDropSystem() {
         try {
-            dropHandler = new DropSystemHandler(this);
+            dropHandler = new DropSystemHandler(this, customItemRegistry);
             dropHandler.initializeDatabase();
             getLogger().info("✓ Drop System: Database initialized successfully.");
 
@@ -121,11 +126,9 @@ public final class Breadmines extends JavaPlugin {
         skyblockEnchantmentManager = new SkyblockEnchantmentManager(this);
         getServer().getServicesManager().register(SkyblockEnchantmentApi.class, skyblockEnchantmentManager, this, ServicePriority.Normal);
 
-        initializeItemRegistry();
-
         // Register Skyblock Commands
         getCommand("mana").setExecutor(new ManaCommand(this));
-        getCommand("givesword").setExecutor(new GiveSwordCommand());
+        getCommand("givesword").setExecutor(new GiveSwordCommand(this));
         getCommand("givesword").setTabCompleter(new GiveSwordTabCompleter());
         
         // Register Dev Commands
@@ -152,14 +155,14 @@ public final class Breadmines extends JavaPlugin {
     /**
      * Initializes the custom item registry service and command surface.
      */
-    private void initializeItemRegistry() {
+    private boolean initializeItemRegistry() {
         itemRegistryRepository = new com.aspectxlol.breadmines.itemregistry.storage.ItemRegistryRepository(this);
         try {
             itemRegistryRepository.initialize();
         } catch (SQLException exception) {
             getLogger().severe("✗ Failed to initialize item registry database: " + exception.getMessage());
             setEnabled(false);
-            return;
+            return false;
         }
 
         customItemRegistry = new CustomItemRegistry(this, itemRegistryRepository);
@@ -173,6 +176,7 @@ public final class Breadmines extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new RegistryMenuListener(this), this);
 
         getLogger().info(ChatColor.GREEN + "✓ Custom item registry initialized!");
+        return true;
     }
 
     /**

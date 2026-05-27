@@ -122,8 +122,8 @@ public class DropCommandHandler implements CommandExecutor {
                 sender.sendMessage("§6=== Debug Status ===");
                 sender.sendMessage("§aDebug mode: " + (dropHandler.isDebugMode() ? "enabled" : "disabled"));
                 sender.sendMessage("§aRegistered blocks: " + dropHandler.getAllBlockDrops().size());
-                List<String> itemIds = dropHandler.getSkriptItemIds();
-                sender.sendMessage("§aSkript item IDs loaded: " + itemIds.size());
+                List<String> itemIds = dropHandler.getRegisteredItemIds();
+                sender.sendMessage("§aRegistry item IDs loaded: " + itemIds.size());
                 return true;
             }
 
@@ -155,10 +155,9 @@ public class DropCommandHandler implements CommandExecutor {
                 sender.sendMessage("§aDatabase item_id: " + itemId);
                 Material material = dropHandler.resolveCustomMaterial(itemId);
                 sender.sendMessage("§aResolved Bukkit Material: " + (material != null ? material.name() : "none"));
-                Object skriptItem = dropHandler.getSkriptItemValue(itemId);
-                sender.sendMessage("§aSkript alias lookup value type: " + (skriptItem != null ? skriptItem.getClass().getSimpleName() : "none"));
-                List<String> itemIds = dropHandler.getSkriptItemIds();
-                sender.sendMessage("§aSkript item registry contains alias: " + itemIds.contains(itemId));
+                sender.sendMessage("§aRegistry item lookup result: " + (dropHandler.resolveDropItem(itemId, 1).isPresent() ? "found" : "none"));
+                List<String> itemIds = dropHandler.getRegisteredItemIds();
+                sender.sendMessage("§aCustom item registry contains id: " + itemIds.contains(itemId));
                 return true;
             }
 

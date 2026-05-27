@@ -1,5 +1,7 @@
 package com.aspectxlol.breadmines.skyblock.command;
 
+import com.aspectxlol.breadmines.Breadmines;
+import com.aspectxlol.breadmines.itemregistry.CustomItemRegistry;
 import com.aspectxlol.breadmines.skyblock.factory.NecronItemFactory;
 import com.aspectxlol.breadmines.util.CommandUtils;
 import org.bukkit.ChatColor;
@@ -15,6 +17,12 @@ import org.bukkit.inventory.ItemStack;
  */
 public class GiveSwordCommand implements CommandExecutor {
 
+    private final CustomItemRegistry itemRegistry;
+
+    public GiveSwordCommand(Breadmines plugin) {
+        this.itemRegistry = plugin.getCustomItemRegistry();
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!CommandUtils.requireOp(sender)) return true;
@@ -29,23 +37,23 @@ public class GiveSwordCommand implements CommandExecutor {
         }
 
         String swordType = args[0].toLowerCase();
-        ItemStack sword = null;
+        ItemStack sword;
 
         switch (swordType) {
             case "hyperion":
-                sword = NecronItemFactory.createHyperion();
+                sword = getOrRegisterSkyblockItem("hyperion", NecronItemFactory.createHyperion());
                 break;
             case "astraea":
-                sword = NecronItemFactory.createAstraea();
+                sword = getOrRegisterSkyblockItem("astraea", NecronItemFactory.createAstraea());
                 break;
             case "valkyrie":
-                sword = NecronItemFactory.createValkyrie();
+                sword = getOrRegisterSkyblockItem("valkyrie", NecronItemFactory.createValkyrie());
                 break;
             case "scylla":
-                sword = NecronItemFactory.createScylla();
+                sword = getOrRegisterSkyblockItem("scylla", NecronItemFactory.createScylla());
                 break;
             case "aotv":
-                sword = NecronItemFactory.createAotV();
+                sword = getOrRegisterSkyblockItem("aotv", NecronItemFactory.createAotV());
                 break;
             default:
                 player.sendMessage(ChatColor.RED + "Unknown sword type: " + swordType);
@@ -58,5 +66,12 @@ public class GiveSwordCommand implements CommandExecutor {
         player.sendMessage(ChatColor.GREEN + "✓ Received " + ChatColor.stripColor(sword.getItemMeta().getDisplayName()));
 
         return true;
+    }
+
+    private ItemStack getOrRegisterSkyblockItem(String id, ItemStack fallback) {
+        return itemRegistry.createItemStack(id).orElseGet(() -> {
+            itemRegistry.registerItem(id, fallback, "skyblock-default");
+            return itemRegistry.createItemStack(id).orElse(fallback);
+        });
     }
 }

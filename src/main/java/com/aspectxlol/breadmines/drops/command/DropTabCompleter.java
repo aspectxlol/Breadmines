@@ -56,10 +56,10 @@ public class DropTabCompleter implements TabCompleter {
                 String action = args[0].toLowerCase();
                 if (action.equals("create") || action.equals("set") || action.equals("update")) {
                     try {
-                        List<String> itemIds = dropHandler.getSkriptItemIds();
+                        List<String> itemIds = dropHandler.getRegisteredItemIds();
                         completions.addAll(itemIds);
                     } catch (Exception e) {
-                        plugin.getLogger().warning("Error fetching Skript item IDs: " + e.getMessage());
+                        plugin.getLogger().warning("Error fetching registry item IDs: " + e.getMessage());
                     }
                 }
             }

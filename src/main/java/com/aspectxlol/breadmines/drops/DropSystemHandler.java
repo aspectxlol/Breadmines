@@ -2,15 +2,17 @@ package com.aspectxlol.breadmines.drops;
 
 import com.aspectxlol.breadmines.drops.storage.DropRepository;
 import com.aspectxlol.breadmines.drops.util.DropUtils;
+import com.aspectxlol.breadmines.itemregistry.CustomItemRegistryApi;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.plugin.java.JavaPlugin;
+import com.aspectxlol.breadmines.Breadmines;
 
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * DropSystemHandler - Manages the block drops registry and database operations.
@@ -18,16 +20,16 @@ import java.util.Map;
  */
 public class DropSystemHandler {
 
-    private final JavaPlugin plugin;
+    private final Breadmines plugin;
     private final DropRepository repository;
     private final DropItemResolver itemResolver;
     private final DropMultiplierService multiplierService;
     private boolean debugMode = false;
 
-    public DropSystemHandler(JavaPlugin plugin) {
+    public DropSystemHandler(Breadmines plugin, CustomItemRegistryApi itemRegistry) {
         this.plugin = plugin;
         this.repository = new DropRepository(plugin);
-        this.itemResolver = new DropItemResolver(plugin);
+        this.itemResolver = new DropItemResolver(itemRegistry);
         this.multiplierService = new DropMultiplierService();
     }
 
@@ -112,18 +114,12 @@ public class DropSystemHandler {
         return itemResolver.resolveCustomMaterial(itemId);
     }
 
-    /**
-     * Get the Skript item value for a given item ID.
-     */
-    public Object getSkriptItemValue(String itemId) {
-        return itemResolver.getSkriptItemValue(itemId);
+    public Optional<ItemStack> resolveDropItem(String itemId, int amount) {
+        return itemResolver.resolveItemStack(itemId, amount);
     }
 
-    /**
-     * Hook into Skript variable {items::*} to fetch available item IDs from the registry.
-     */
-    public List<String> getSkriptItemIds() {
-        return itemResolver.getSkriptItemIds();
+    public List<String> getRegisteredItemIds() {
+        return itemResolver.getRegisteredItemIds();
     }
 
     /**

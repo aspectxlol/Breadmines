@@ -10,7 +10,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
-import ch.njol.skript.variables.Variables;
 
 import java.sql.SQLException;
 import java.util.Locale;
@@ -64,27 +63,10 @@ public class DropBlockListener implements Listener {
                 event.setDropItems(false);
                 event.setExpToDrop(0);
 
-                Variables.setVariable("registry::temp::target_id", itemId, null, false);
-                Variables.setVariable("registry::temp::fortune_amount", nativeFortuneAmount, null, false);
-
-                Material customMaterial = dropHandler.resolveCustomMaterial(itemId);
-                if (customMaterial != null) {
-                    ItemStack customDrop = new ItemStack(customMaterial, Math.max(1, nativeFortuneAmount));
-                    dropHandler.giveItemToPlayer(player, customDrop, block, blockName);
-                } else {
-                    Object skriptItem = dropHandler.getSkriptItemValue(itemId);
-                    if (dropHandler.isDebugMode()) {
-                        plugin.getLogger().info("[DEBUG] Skript alias lookup=" + itemId + " -> "
-                                + (skriptItem != null ? skriptItem.getClass().getName() : "null"));
-                    }
-                    if (skriptItem instanceof ItemStack) {
-                        ItemStack customDrop = ((ItemStack) skriptItem).clone();
-                        customDrop.setAmount(Math.max(1, nativeFortuneAmount));
-                        dropHandler.giveItemToPlayer(player, customDrop, block, blockName);
-                    } else {
-                        plugin.getLogger().info("Block break intercepted: " + blockName + " -> " + itemId + " (Skript alias/custom item)");
-                    }
-                }
+                dropHandler.resolveDropItem(itemId, nativeFortuneAmount).ifPresentOrElse(customDrop ->
+                        dropHandler.giveItemToPlayer(player, customDrop, block, blockName),
+                    () -> plugin.getLogger().warning("Registered drop item id not found in registry or material list: " + itemId)
+                );
             }
         } catch (SQLException e) {
             plugin.getLogger().severe("Error querying database: " + e.getMessage());
