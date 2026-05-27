@@ -9,6 +9,8 @@ public interface CustomItemRegistryApi {
 
     CustomItemDefinition registerItem(String name, ItemStack itemStack);
 
+    CustomItemDefinition registerItemFromDisplayName(ItemStack itemStack);
+
     Optional<CustomItemDefinition> getDefinition(String name);
 
     Optional<CustomItemDefinition> getDefinition(ItemStack itemStack);

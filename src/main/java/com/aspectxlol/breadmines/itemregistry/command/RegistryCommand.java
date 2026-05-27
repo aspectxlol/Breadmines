@@ -22,7 +22,7 @@ import java.util.Locale;
 
 public class RegistryCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> ROOT_SUBCOMMANDS = Arrays.asList("add", "register", "store", "get", "give", "remove", "delete", "rm", "del", "list", "ls", "show");
+    private static final List<String> ROOT_SUBCOMMANDS = Arrays.asList("add", "register", "store", "lazyadd", "lazy", "get", "give", "remove", "delete", "rm", "del", "list", "ls", "show");
 
     private final Breadmines plugin;
     private final CustomItemRegistry registry;
@@ -51,6 +51,9 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
             case "register":
             case "store":
                 return handleAdd(sender, label, args);
+            case "lazyadd":
+            case "lazy":
+                return handleLazyAdd(sender, label);
             case "get":
             case "give":
                 return handleGet(sender, label, args);
@@ -109,6 +112,27 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean handleLazyAdd(CommandSender sender, String label) {
+        Player player = CommandUtils.requirePlayer(sender);
+        if (player == null) {
+            return true;
+        }
+
+        ItemStack heldItem = player.getInventory().getItemInMainHand();
+        if (heldItem == null || heldItem.getType().isAir()) {
+            sender.sendMessage(ChatColor.RED + "Hold an item in your main hand first.");
+            return true;
+        }
+
+        try {
+            CustomItemDefinition definition = registry.registerItemFromDisplayName(heldItem, player.getName());
+            sender.sendMessage(ChatColor.GREEN + "✓ Lazily registered item " + ChatColor.AQUA + definition.getId() + ChatColor.GREEN + " from held item name.");
+        } catch (IllegalArgumentException exception) {
+            sender.sendMessage(ChatColor.RED + exception.getMessage());
+        }
+        return true;
+    }
+
     private boolean handleGet(CommandSender sender, String label, String[] args) {
         Player player = CommandUtils.requirePlayer(sender);
         if (player == null) {
@@ -159,8 +183,8 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
     }
 
     private void sendUsage(CommandSender sender, String label) {
-        sender.sendMessage(ChatColor.YELLOW + "Usage: /" + label + " <add|get|remove|delete|list> ...");
-        sender.sendMessage(ChatColor.GRAY + "Aliases: /" + label + " register, store, give, delete, rm, del, ls, show");
+        sender.sendMessage(ChatColor.YELLOW + "Usage: /" + label + " <add|lazyadd|get|remove|delete|list> ...");
+        sender.sendMessage(ChatColor.GRAY + "Add uses an explicit name. Lazyadd uses the held item's display name. Aliases: /" + label + " register, store, lazy, give, delete, rm, del, ls, show");
     }
 
     private List<String> filterByPrefix(String prefix, Collection<String> values) {

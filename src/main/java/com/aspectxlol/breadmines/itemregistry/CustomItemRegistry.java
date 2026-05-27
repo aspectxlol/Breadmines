@@ -44,15 +44,54 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
         return registerItem(name, itemStack, "api");
     }
 
+    @Override
+    public synchronized CustomItemDefinition registerItemFromDisplayName(ItemStack itemStack) {
+        return registerItemFromDisplayName(itemStack, "api");
+    }
+
     public synchronized CustomItemDefinition registerItem(String name, ItemStack itemStack, String source) {
         String normalizedName = normalizeName(name);
         if (normalizedName.isEmpty()) {
             throw new IllegalArgumentException("Item registry name cannot be empty");
         }
 
+        if (definitions.containsKey(normalizedName)) {
+            throw new IllegalArgumentException("Duplicate registry key: " + normalizedName);
+        }
+
         ItemStack snapshot = itemStack.clone();
         String displayName = resolveDisplayName(snapshot, normalizedName);
         CustomItemDefinition definition = new CustomItemDefinition(normalizedName, displayName, snapshot, System.currentTimeMillis(), source);
+        definitions.put(normalizedName, definition);
+        save();
+        return definition;
+    }
+
+    public synchronized CustomItemDefinition registerItemFromDisplayName(ItemStack itemStack, String source) {
+        if (itemStack == null || itemStack.getType() == Material.AIR) {
+            throw new IllegalArgumentException("Held item is empty or invalid.");
+        }
+
+        if (!itemStack.hasItemMeta()) {
+            throw new IllegalArgumentException("Item must have a display name to be registered.");
+        }
+
+        ItemMeta meta = itemStack.getItemMeta();
+        if (meta == null || !meta.hasDisplayName()) {
+            throw new IllegalArgumentException("Item must have a display name to be registered.");
+        }
+
+        String normalizedName = normalizeName(ChatColor.stripColor(meta.getDisplayName()));
+        if (normalizedName.isEmpty()) {
+            throw new IllegalArgumentException("Item display name is problematic after sanitizing.");
+        }
+
+        if (definitions.containsKey(normalizedName)) {
+            throw new IllegalArgumentException("Duplicate registry key: " + normalizedName);
+        }
+
+        ItemStack snapshot = itemStack.clone();
+        CustomItemDefinition definition = new CustomItemDefinition(normalizedName, resolveDisplayName(snapshot, normalizedName), snapshot, System.currentTimeMillis(), source);
         definitions.put(normalizedName, definition);
         save();
         return definition;

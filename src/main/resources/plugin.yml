@@ -27,7 +27,7 @@ commands:
     permission: op
   registry:
     description: "Manage the custom item registry"
-    usage: "/registry <add|get|remove|delete|list> ..."
+    usage: "/registry <add|lazyadd|get|remove|delete|list> ..."
     permission: breadmines.registry
     aliases: [itemregistry, itemreg, reg]
   recipe:
