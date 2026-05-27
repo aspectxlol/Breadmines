@@ -1,26 +1,23 @@
 package com.aspectxlol.breadmines.itemregistry;
 
 import com.aspectxlol.breadmines.Breadmines;
+import com.aspectxlol.breadmines.itemregistry.storage.ItemRegistryRepository;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.sql.SQLException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
@@ -29,15 +26,14 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
     private static final Pattern NORMALIZE_PATTERN = Pattern.compile("[^a-z0-9]+", Pattern.UNICODE_CASE);
 
     private final Breadmines plugin;
-    private final File storageFile;
     private final NamespacedKey registryKey;
+    private final ItemRegistryRepository repository;
     private final Map<String, CustomItemDefinition> definitions = new ConcurrentHashMap<>();
 
-    public CustomItemRegistry(Breadmines plugin) {
+    public CustomItemRegistry(Breadmines plugin, ItemRegistryRepository repository) {
         this.plugin = plugin;
-        this.storageFile = new File(plugin.getDataFolder(), "custom_item_registry.yml");
         this.registryKey = new NamespacedKey(plugin, "custom_item_id");
-        load();
+        this.repository = repository;
     }
 
     @Override
@@ -55,7 +51,7 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
         String displayName = resolveDisplayName(snapshot, normalizedName);
         CustomItemDefinition definition = new CustomItemDefinition(normalizedName, displayName, snapshot, System.currentTimeMillis(), source);
         definitions.put(normalizedName, definition);
-        save();
+        persistDefinition(definition);
         return definition;
     }
 
@@ -90,7 +86,7 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
             return false;
         }
 
-        save();
+        removeDefinition(normalizedName);
         return true;
     }
 
@@ -138,67 +134,19 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
     public void load() {
         definitions.clear();
 
-        if (!storageFile.exists()) {
-            return;
-        }
-
-        YamlConfiguration configuration = YamlConfiguration.loadConfiguration(storageFile);
-        ConfigurationSection itemsSection = configuration.getConfigurationSection("items");
-        if (itemsSection == null) {
-            return;
-        }
-
-        for (String key : itemsSection.getKeys(false)) {
-            ConfigurationSection definitionSection = itemsSection.getConfigurationSection(key);
-            if (definitionSection == null) {
-                continue;
-            }
-
-            Map<String, Object> serialized = new LinkedHashMap<>();
-            serialized.put("id", definitionSection.getString("id", key));
-            serialized.put("displayName", definitionSection.getString("displayName", key));
-            serialized.put("createdAtMillis", definitionSection.getLong("createdAtMillis", System.currentTimeMillis()));
-            serialized.put("source", definitionSection.getString("source", "unknown"));
-
-            ConfigurationSection itemSection = definitionSection.getConfigurationSection("item");
-            if (itemSection == null) {
-                continue;
-            }
-
-            serialized.put("item", itemSection.getValues(true));
-
-            try {
-                CustomItemDefinition definition = CustomItemDefinition.deserialize(serialized);
+        try {
+            for (ItemRegistryRepository.RegistryRow row : repository.fetchAll()) {
+                CustomItemDefinition definition = new CustomItemDefinition(row.registryKey(), row.displayName(), row.itemStack(), row.createdAtMillis(), row.source());
                 definitions.put(definition.getId(), definition);
-            } catch (Exception exception) {
-                plugin.getLogger().warning("Skipping invalid registry entry '" + key + "': " + exception.getMessage());
             }
+        } catch (SQLException exception) {
+            plugin.getLogger().severe("Failed to load custom item registry: " + exception.getMessage());
+            return;
         }
     }
 
-    public synchronized void save() {
-        if (!plugin.getDataFolder().exists() && !plugin.getDataFolder().mkdirs()) {
-            plugin.getLogger().warning("Could not create plugin data folder for item registry storage.");
-            return;
-        }
-
-        YamlConfiguration configuration = new YamlConfiguration();
-        ConfigurationSection itemsSection = configuration.createSection("items");
-
-        for (CustomItemDefinition definition : getDefinitions()) {
-            ConfigurationSection definitionSection = itemsSection.createSection(definition.getId());
-            definitionSection.set("id", definition.getId());
-            definitionSection.set("displayName", definition.getDisplayName());
-            definitionSection.set("createdAtMillis", definition.getCreatedAtMillis());
-            definitionSection.set("source", definition.getSource());
-            definitionSection.set("item", definition.getItemStack().serialize());
-        }
-
-        try {
-            configuration.save(storageFile);
-        } catch (IOException exception) {
-            plugin.getLogger().warning("Failed to save item registry: " + exception.getMessage());
-        }
+    public void save() {
+        // No-op retained for lifecycle compatibility; data is persisted per change.
     }
 
     private String resolveDisplayName(ItemStack itemStack, String fallbackName) {
@@ -226,5 +174,21 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
 
         meta.getPersistentDataContainer().set(registryKey, PersistentDataType.STRING, id);
         itemStack.setItemMeta(meta);
+    }
+
+    private void persistDefinition(CustomItemDefinition definition) {
+        try {
+            repository.upsert(definition.getId(), definition.getDisplayName(), definition.getCreatedAtMillis(), definition.getSource(), definition.getItemStack());
+        } catch (SQLException exception) {
+            plugin.getLogger().severe("Failed to save custom item registry entry '" + definition.getId() + "': " + exception.getMessage());
+        }
+    }
+
+    private void removeDefinition(String id) {
+        try {
+            repository.delete(id);
+        } catch (SQLException exception) {
+            plugin.getLogger().severe("Failed to delete custom item registry entry '" + id + "': " + exception.getMessage());
+        }
     }
 }

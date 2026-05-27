@@ -43,6 +43,7 @@ public final class Breadmines extends JavaPlugin {
     private static Breadmines instance;
     private DropSystemHandler dropHandler;
     private CustomItemRegistry customItemRegistry;
+    private com.aspectxlol.breadmines.itemregistry.storage.ItemRegistryRepository itemRegistryRepository;
     private SkyblockEnchantmentManager skyblockEnchantmentManager;
     private ManaManager manaManager;
     private volatile boolean isSystemEnabled = true;
@@ -73,6 +74,10 @@ public final class Breadmines extends JavaPlugin {
 
         if (customItemRegistry != null) {
             customItemRegistry.save();
+        }
+
+        if (itemRegistryRepository != null) {
+            itemRegistryRepository.close();
         }
 
         // Close database connection
@@ -148,7 +153,17 @@ public final class Breadmines extends JavaPlugin {
      * Initializes the custom item registry service and command surface.
      */
     private void initializeItemRegistry() {
-        customItemRegistry = new CustomItemRegistry(this);
+        itemRegistryRepository = new com.aspectxlol.breadmines.itemregistry.storage.ItemRegistryRepository(this);
+        try {
+            itemRegistryRepository.initialize();
+        } catch (SQLException exception) {
+            getLogger().severe("✗ Failed to initialize item registry database: " + exception.getMessage());
+            setEnabled(false);
+            return;
+        }
+
+        customItemRegistry = new CustomItemRegistry(this, itemRegistryRepository);
+        customItemRegistry.load();
         getServer().getServicesManager().register(CustomItemRegistryApi.class, customItemRegistry, this, ServicePriority.Normal);
 
         RegistryCommand registryCommand = new RegistryCommand(this);
