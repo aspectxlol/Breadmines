@@ -30,6 +30,11 @@ commands:
     usage: "/registry <add|get|remove|delete|list> ..."
     permission: breadmines.registry
     aliases: [itemregistry, itemreg, reg]
+  recipe:
+    description: "Manage autocompressor recipes"
+    usage: "/recipe <create|update|delete|list|info> ..."
+    permission: breadmines.recipe
+    aliases: [recipes, rcp, rec]
 
 permissions:
   admin.setup:
@@ -40,4 +45,7 @@ permissions:
     default: op
   breadmines.registry:
     description: "Permission to manage the custom item registry"
+    default: op
+  breadmines.recipe:
+    description: "Permission to manage autocompressor recipes"
     default: op

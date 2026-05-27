@@ -4,6 +4,9 @@ import com.aspectxlol.breadmines.drops.DropSystemHandler;
 import com.aspectxlol.breadmines.drops.command.DropCommandHandler;
 import com.aspectxlol.breadmines.drops.command.DropTabCompleter;
 import com.aspectxlol.breadmines.drops.listener.DropBlockListener;
+import com.aspectxlol.breadmines.general.recipes.RecipeManager;
+import com.aspectxlol.breadmines.general.recipes.command.RecipeCommand;
+import com.aspectxlol.breadmines.general.recipes.gui.RecipeListMenuListener;
 import com.aspectxlol.breadmines.itemregistry.CustomItemRegistry;
 import com.aspectxlol.breadmines.itemregistry.CustomItemRegistryApi;
 import com.aspectxlol.breadmines.itemregistry.command.RegistryCommand;
@@ -43,11 +46,12 @@ public final class Breadmines extends JavaPlugin {
     private static Breadmines instance;
     private DropSystemHandler dropHandler;
     private CustomItemRegistry customItemRegistry;
-    private com.aspectxlol.breadmines.itemregistry.storage.ItemRegistryRepository itemRegistryRepository;
+    private RecipeManager recipeManager;
     private SkyblockEnchantmentManager skyblockEnchantmentManager;
     private ManaManager manaManager;
     private volatile boolean isSystemEnabled = true;
     private BukkitTask asyncTaskHandle;
+    private BukkitTask autoCompressorTask;
     private double manaRegenPerTick = 7.5; // Adjustable for dev testing
 
     @Override
@@ -56,6 +60,11 @@ public final class Breadmines extends JavaPlugin {
 
         // Initialize shared item registry first so other systems can depend on it.
         if (!initializeItemRegistry()) {
+            return;
+        }
+
+        // Initialize general systems that depend on item registry.
+        if (!initializeGeneralSystems()) {
             return;
         }
 
@@ -77,12 +86,16 @@ public final class Breadmines extends JavaPlugin {
             asyncTaskHandle.cancel();
         }
 
-        if (customItemRegistry != null) {
-            customItemRegistry.save();
+        if (autoCompressorTask != null) {
+            autoCompressorTask.cancel();
         }
 
-        if (itemRegistryRepository != null) {
-            itemRegistryRepository.close();
+        if (recipeManager != null) {
+            recipeManager.shutdown();
+        }
+
+        if (customItemRegistry != null) {
+            customItemRegistry.save();
         }
 
         // Close database connection
@@ -156,16 +169,7 @@ public final class Breadmines extends JavaPlugin {
      * Initializes the custom item registry service and command surface.
      */
     private boolean initializeItemRegistry() {
-        itemRegistryRepository = new com.aspectxlol.breadmines.itemregistry.storage.ItemRegistryRepository(this);
-        try {
-            itemRegistryRepository.initialize();
-        } catch (SQLException exception) {
-            getLogger().severe("✗ Failed to initialize item registry database: " + exception.getMessage());
-            setEnabled(false);
-            return false;
-        }
-
-        customItemRegistry = new CustomItemRegistry(this, itemRegistryRepository);
+        customItemRegistry = new CustomItemRegistry(this);
         customItemRegistry.load();
         getServer().getServicesManager().register(CustomItemRegistryApi.class, customItemRegistry, this, ServicePriority.Normal);
 
@@ -177,6 +181,35 @@ public final class Breadmines extends JavaPlugin {
 
         getLogger().info(ChatColor.GREEN + "✓ Custom item registry initialized!");
         return true;
+    }
+
+    private boolean initializeGeneralSystems() {
+        recipeManager = new RecipeManager(this);
+        try {
+            recipeManager.initialize();
+        } catch (SQLException exception) {
+            getLogger().severe("✗ Failed to initialize recipe database: " + exception.getMessage());
+            setEnabled(false);
+            return false;
+        }
+
+        RecipeCommand recipeCommand = new RecipeCommand(this);
+        getCommand("recipe").setExecutor(recipeCommand);
+        getCommand("recipe").setTabCompleter(recipeCommand);
+        Bukkit.getPluginManager().registerEvents(new RecipeListMenuListener(this), this);
+
+        startAutoCompressorTask();
+        getLogger().info(ChatColor.GREEN + "✓ General recipe/autocompressor system initialized!");
+        return true;
+    }
+
+    private void startAutoCompressorTask() {
+        autoCompressorTask = Bukkit.getScheduler().runTaskTimer(this, () -> {
+            if (recipeManager == null) {
+                return;
+            }
+            recipeManager.processAutoCompressors();
+        }, 20L, 20L);
     }
 
     /**
@@ -278,6 +311,10 @@ public final class Breadmines extends JavaPlugin {
      */
     public CustomItemRegistry getCustomItemRegistry() {
         return customItemRegistry;
+    }
+
+    public RecipeManager getRecipeManager() {
+        return recipeManager;
     }
 
     /**
