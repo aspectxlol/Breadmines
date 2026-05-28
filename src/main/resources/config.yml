@@ -1,0 +1,12 @@
+registry:
+  storage:
+    file: "custom_item_registry.json"
+  github:
+    enabled: true
+    owner: "aspectxlol"
+    repo: "breadmines-repo"
+    branch: "main"
+    path: "data/item_registry.json"
+    token: "" # Leave empty; set registry.github.token in plugins/Breadmines/secrets.yml
+    syncOnStartup: true
+    syncOnSave: true

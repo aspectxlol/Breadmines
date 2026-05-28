@@ -1,0 +1,151 @@
+items:
+  uncompressed_block_coal:
+    id: uncompressed_block_coal
+    displayName: uncompressed_block_coal
+    createdAtMillis: 1779889217957
+    source: aspectxlol
+    item:
+      DataVersion: 4671
+      id: minecraft:coal_block
+      count: 64
+      schema_version: 1
+  uncompressed_block_diamond:
+    id: uncompressed_block_diamond
+    displayName: uncompressed_block_diamond
+    createdAtMillis: 1779889280909
+    source: aspectxlol
+    item:
+      DataVersion: 4671
+      id: minecraft:diamond_block
+      count: 64
+      schema_version: 1
+  uncompressed_block_emerald:
+    id: uncompressed_block_emerald
+    displayName: uncompressed_block_emerald
+    createdAtMillis: 1779889289515
+    source: aspectxlol
+    item:
+      DataVersion: 4671
+      id: minecraft:emerald_block
+      count: 64
+      schema_version: 1
+  uncompressed_block_iron:
+    id: uncompressed_block_iron
+    displayName: uncompressed_block_iron
+    createdAtMillis: 1779889232354
+    source: aspectxlol
+    item:
+      DataVersion: 4671
+      id: minecraft:raw_iron_block
+      count: 64
+      schema_version: 1
+  uncompressed_coal:
+    id: uncompressed_coal
+    displayName: uncompressed_coal
+    createdAtMillis: 1779889195156
+    source: aspectxlol
+    item:
+      DataVersion: 4671
+      id: minecraft:coal
+      count: 64
+      schema_version: 1
+  uncompressed_cobblestone:
+    id: uncompressed_cobblestone
+    displayName: uncompressed_cobblestone
+    createdAtMillis: 1779888824141
+    source: aspectxlol
+    item:
+      DataVersion: 4671
+      id: minecraft:cobblestone
+      count: 64
+      schema_version: 1
+  uncompressed_deepslate:
+    id: uncompressed_deepslate
+    displayName: uncompressed_deepslate
+    createdAtMillis: 1779889270484
+    source: aspectxlol
+    item:
+      DataVersion: 4671
+      id: minecraft:cobbled_deepslate
+      count: 64
+      schema_version: 1
+  uncompressed_diamond:
+    id: uncompressed_diamond
+    displayName: uncompressed_diamond
+    createdAtMillis: 1779889284876
+    source: aspectxlol
+    item:
+      DataVersion: 4671
+      id: minecraft:diamond
+      count: 64
+      schema_version: 1
+  uncompressed_emerald:
+    id: uncompressed_emerald
+    displayName: uncompressed_emerald
+    createdAtMillis: 1779889293377
+    source: aspectxlol
+    item:
+      DataVersion: 4671
+      id: minecraft:emerald
+      count: 64
+      schema_version: 1
+  uncompressed_gold:
+    id: uncompressed_gold
+    displayName: uncompressed_gold
+    createdAtMillis: 1779889254840
+    source: aspectxlol
+    item:
+      DataVersion: 4671
+      id: minecraft:raw_gold
+      count: 64
+      schema_version: 1
+  uncompressed_iron:
+    id: uncompressed_iron
+    displayName: uncompressed_iron
+    createdAtMillis: 1779889226545
+    source: aspectxlol
+    item:
+      DataVersion: 4671
+      id: minecraft:raw_iron
+      count: 64
+      schema_version: 1
+  uncompressed_polished_deepslate:
+    id: uncompressed_polished_deepslate
+    displayName: uncompressed_polished_deepslate
+    createdAtMillis: 1779889264557
+    source: aspectxlol
+    item:
+      DataVersion: 4671
+      id: minecraft:polished_deepslate
+      count: 64
+      schema_version: 1
+  uncompressed_smooth_cobblestone:
+    id: uncompressed_smooth_cobblestone
+    displayName: uncompressed_smooth_cobblestone
+    createdAtMillis: 1779888833689
+    source: aspectxlol
+    item:
+      DataVersion: 4671
+      id: minecraft:smooth_stone
+      count: 64
+      schema_version: 1
+  uncompressed_stripped_wood:
+    id: uncompressed_stripped_wood
+    displayName: uncompressed_stripped_wood
+    createdAtMillis: 1779888210495
+    source: aspectxlol
+    item:
+      DataVersion: 4671
+      id: minecraft:stripped_oak_log
+      count: 1
+      schema_version: 1
+  uncompressed_wood:
+    id: uncompressed_wood
+    displayName: uncompressed_wood
+    createdAtMillis: 1779888195134
+    source: aspectxlol
+    item:
+      DataVersion: 4671
+      id: minecraft:oak_log
+      count: 3
+      schema_version: 1

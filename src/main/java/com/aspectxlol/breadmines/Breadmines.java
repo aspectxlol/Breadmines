@@ -58,6 +58,7 @@ public final class Breadmines extends JavaPlugin {
     @Override
     public void onEnable() {
         instance = this;
+        saveDefaultConfig();
 
         // Initialize shared item registry first so other systems can depend on it.
         if (!initializeItemRegistry()) {
