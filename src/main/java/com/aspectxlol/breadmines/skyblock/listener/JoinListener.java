@@ -33,7 +33,7 @@ public class JoinListener implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        manaManager.initializePlayerMana(player);
+        manaManager.ensurePlayerMana(player);
         if (plugin.getSkyblockEnchantmentManager() != null) {
             plugin.getSkyblockEnchantmentManager().refreshPlayerStats(player, plugin.getBaseManaRegenPerSecond());
         }

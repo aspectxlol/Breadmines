@@ -107,6 +107,9 @@ public final class RecipeManager {
 
     public void processAutoCompressors() {
         for (Player player : plugin.getServer().getOnlinePlayers()) {
+            if (player == null) {
+                continue;
+            }
             PlayerInventory inventory = player.getInventory();
             if (!hasAutoCompressor(inventory)) {
                 continue;

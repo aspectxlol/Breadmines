@@ -53,6 +53,16 @@ public class ManaManager {
     }
 
     /**
+     * Ensures a player has a mana profile without overwriting existing values.
+     */
+    public void ensurePlayerMana(Player player) {
+        String key = player.getUniqueId().toString();
+        playerManaMap.putIfAbsent(key, DEFAULT_MANA);
+        playerManaRegenMap.putIfAbsent(key, DEFAULT_REGEN);
+        playerMaxManaMap.putIfAbsent(key, DEFAULT_MAX_MANA);
+    }
+
+    /**
      * Checks if a player has enough mana for an ability.
      * Returns true if current mana >= required amount.
      */
@@ -145,5 +155,7 @@ public class ManaManager {
      */
     public void clearAllMana() {
         playerManaMap.clear();
+        playerManaRegenMap.clear();
+        playerMaxManaMap.clear();
     }
 }

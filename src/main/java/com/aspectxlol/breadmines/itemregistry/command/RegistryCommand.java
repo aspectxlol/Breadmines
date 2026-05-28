@@ -24,12 +24,10 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> ROOT_SUBCOMMANDS = Arrays.asList("add", "register", "store", "lazyadd", "lazy", "get", "give", "remove", "delete", "rm", "del", "list", "ls", "show", "search", "find", "query");
 
-    private final Breadmines plugin;
     private final CustomItemRegistry registry;
     private final RegistryMenu menu;
 
     public RegistryCommand(Breadmines plugin) {
-        this.plugin = plugin;
         this.registry = plugin.getCustomItemRegistry();
         this.menu = new RegistryMenu(plugin);
     }
@@ -198,7 +196,7 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
         }
 
         String query = joinArgs(args, 1);
-        menu.open(player, 1, com.aspectxlol.breadmines.itemregistry.gui.RegistryItemFilter.ALL, com.aspectxlol.breadmines.itemregistry.gui.RegistrySortMode.NAME_ASC, query);
+        menu.open(player, 1, com.aspectxlol.breadmines.itemregistry.gui.RegistrySortMode.NAME_ASC, query);
         sender.sendMessage(ChatColor.GREEN + "Opened search results for " + ChatColor.AQUA + query + ChatColor.GREEN + ".");
         return true;
     }

@@ -16,12 +16,33 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.stream.Collectors;
 
 public final class RegistryMenu {
 
     private static final int INVENTORY_SIZE = 54;
-    private static final int CONTENT_SLOTS = 45;
+    static final int CONTENT_SLOTS = 45;
+
+    static final int SLOT_PREV_PAGE = 45;
+    static final int SLOT_CONTROLS_MENU = 46;
+    static final int SLOT_SORT_CYCLE = 47;
+    static final int SLOT_SPACER = 48;
+    static final int SLOT_PAGE_INFO = 49;
+    static final int SLOT_RESET = 50;
+    static final int SLOT_FILLER = 51;
+    static final int SLOT_CLOSE = 52;
+    static final int SLOT_NEXT_PAGE = 53;
+
+    static final int SLOT_CONTROLS_HEADER = 10;
+    static final int SLOT_CONTROLS_QUERY = 11;
+    static final int SLOT_CONTROLS_SORT = 12;
+    static final int SLOT_CONTROLS_PAGE = 13;
+
+    static final int SLOT_SORT_NAME_ASC = 29;
+    static final int SLOT_SORT_NAME_DESC = 30;
+    static final int SLOT_SORT_TYPE_ASC = 31;
+    static final int SLOT_SORT_TYPE_DESC = 32;
+    static final int SLOT_SORT_NEWEST = 33;
+    static final int SLOT_SORT_OLDEST = 34;
 
     private final CustomItemRegistry registry;
 
@@ -30,58 +51,62 @@ public final class RegistryMenu {
     }
 
     public void open(Player player, int page) {
-        player.openInventory(createBrowserInventory(page, RegistryItemFilter.ALL, RegistrySortMode.NAME_ASC, null));
+        player.openInventory(createBrowserInventory(page, RegistrySortMode.NAME_ASC, null));
     }
 
-    public void open(Player player, int page, RegistryItemFilter filter, RegistrySortMode sortMode) {
-        player.openInventory(createBrowserInventory(page, filter, sortMode, null));
+    public void open(Player player, int page, RegistrySortMode sortMode) {
+        player.openInventory(createBrowserInventory(page, sortMode, null));
     }
 
-    public void open(Player player, int page, RegistryItemFilter filter, RegistrySortMode sortMode, String searchQuery) {
-        player.openInventory(createBrowserInventory(page, filter, sortMode, searchQuery));
+    public void open(Player player, int page, RegistrySortMode sortMode, String searchQuery) {
+        player.openInventory(createBrowserInventory(page, sortMode, searchQuery));
     }
 
-    public void openControls(Player player, int page, RegistryItemFilter filter, RegistrySortMode sortMode) {
-        openControls(player, page, filter, sortMode, null);
+    public void openControls(Player player, int page, RegistrySortMode sortMode) {
+        openControls(player, page, sortMode, null);
     }
 
-    public void openControls(Player player, int page, RegistryItemFilter filter, RegistrySortMode sortMode, String searchQuery) {
-        player.openInventory(createControlsInventory(page, filter, sortMode, searchQuery));
+    public void openControls(Player player, int page, RegistrySortMode sortMode, String searchQuery) {
+        player.openInventory(createControlsInventory(page, sortMode, searchQuery));
     }
 
-    public Inventory createBrowserInventory(int page, RegistryItemFilter filter, RegistrySortMode sortMode) {
-        return createBrowserInventory(page, filter, sortMode, null);
+    public Inventory createBrowserInventory(int page, RegistrySortMode sortMode) {
+        return createBrowserInventory(page, sortMode, null);
     }
 
-    public Inventory createBrowserInventory(int page, RegistryItemFilter filter, RegistrySortMode sortMode, String searchQuery) {
-        List<CustomItemDefinition> definitions = getFilteredDefinitions(filter, sortMode, searchQuery);
-        int totalPages = Math.max(1, (int) Math.ceil(definitions.size() / (double) CONTENT_SLOTS));
-        int safePage = Math.max(1, Math.min(page, totalPages));
+    public Inventory createBrowserInventory(int page, RegistrySortMode sortMode, String searchQuery) {
+        List<CustomItemDefinition> definitions = getVisibleDefinitions(sortMode, searchQuery);
+        int totalPages = calculateTotalPages(definitions.size());
+        int safePage = clampPage(page, totalPages);
 
-        Inventory inventory = Bukkit.createInventory(new RegistryMenuHolder(RegistryMenuView.BROWSER, safePage, filter, sortMode, searchQuery), INVENTORY_SIZE, buildTitle(safePage, totalPages, searchQuery));
+        Inventory inventory = Bukkit.createInventory(new RegistryMenuHolder(RegistryMenuView.BROWSER, safePage, sortMode, searchQuery), INVENTORY_SIZE, buildTitle(safePage, totalPages, searchQuery));
         fillBackground(inventory);
         placeItems(inventory, definitions, safePage);
         placeControls(inventory, safePage, totalPages);
         return inventory;
     }
 
-    public Inventory createControlsInventory(int page, RegistryItemFilter filter, RegistrySortMode sortMode) {
-        return createControlsInventory(page, filter, sortMode, null);
+    public Inventory createControlsInventory(int page, RegistrySortMode sortMode) {
+        return createControlsInventory(page, sortMode, null);
     }
 
-    public Inventory createControlsInventory(int page, RegistryItemFilter filter, RegistrySortMode sortMode, String searchQuery) {
-        List<CustomItemDefinition> definitions = getFilteredDefinitions(filter, sortMode, searchQuery);
-        int totalPages = Math.max(1, (int) Math.ceil(definitions.size() / (double) CONTENT_SLOTS));
-        int safePage = Math.max(1, Math.min(page, totalPages));
+    public Inventory createControlsInventory(int page, RegistrySortMode sortMode, String searchQuery) {
+        List<CustomItemDefinition> definitions = getVisibleDefinitions(sortMode, searchQuery);
+        int totalPages = calculateTotalPages(definitions.size());
+        int safePage = clampPage(page, totalPages);
 
-        Inventory inventory = Bukkit.createInventory(new RegistryMenuHolder(RegistryMenuView.CONTROLS, safePage, filter, sortMode, searchQuery), INVENTORY_SIZE, ChatColor.DARK_PURPLE + "Search & Sort");
+        Inventory inventory = Bukkit.createInventory(new RegistryMenuHolder(RegistryMenuView.CONTROLS, safePage, sortMode, searchQuery), INVENTORY_SIZE, ChatColor.DARK_PURPLE + "Search & Sort");
         fillBackground(inventory);
-        placeControlsMenu(inventory, safePage, totalPages, filter, sortMode, searchQuery);
+        placeControlsMenu(inventory, safePage, totalPages, sortMode, searchQuery);
         return inventory;
     }
 
     public int getTotalPages() {
-        return Math.max(1, (int) Math.ceil(registry.getDefinitions().size() / (double) CONTENT_SLOTS));
+        return calculateTotalPages(registry.getDefinitions().size());
+    }
+
+    public int getTotalPages(String searchQuery) {
+        return calculateTotalPages(getVisibleDefinitions(RegistrySortMode.NAME_ASC, searchQuery).size());
     }
 
     private void placeItems(Inventory inventory, List<CustomItemDefinition> definitions, int page) {
@@ -110,18 +135,18 @@ public final class RegistryMenu {
         }
     }
 
-    public CustomItemDefinition getDefinitionAt(int page, int rawSlot, RegistryItemFilter filter, RegistrySortMode sortMode) {
-        return getDefinitionAt(page, rawSlot, filter, sortMode, null);
+    public CustomItemDefinition getDefinitionAt(int page, int rawSlot, RegistrySortMode sortMode) {
+        return getDefinitionAt(page, rawSlot, sortMode, null);
     }
 
-    public CustomItemDefinition getDefinitionAt(int page, int rawSlot, RegistryItemFilter filter, RegistrySortMode sortMode, String searchQuery) {
+    public CustomItemDefinition getDefinitionAt(int page, int rawSlot, RegistrySortMode sortMode, String searchQuery) {
         if (rawSlot < 0 || rawSlot >= CONTENT_SLOTS) {
             return null;
         }
 
-        List<CustomItemDefinition> definitions = getFilteredDefinitions(filter, sortMode, searchQuery);
-        int totalPages = Math.max(1, (int) Math.ceil(definitions.size() / (double) CONTENT_SLOTS));
-        int safePage = Math.max(1, Math.min(page, totalPages));
+        List<CustomItemDefinition> definitions = getVisibleDefinitions(sortMode, searchQuery);
+        int totalPages = calculateTotalPages(definitions.size());
+        int safePage = clampPage(page, totalPages);
         int index = ((safePage - 1) * CONTENT_SLOTS) + rawSlot;
 
         if (index < 0 || index >= definitions.size()) {
@@ -132,41 +157,43 @@ public final class RegistryMenu {
     }
 
     private void placeControls(Inventory inventory, int page, int totalPages) {
-        inventory.setItem(45, createArrow(Material.ARROW, ChatColor.YELLOW + "Previous Page", page > 1 ? ChatColor.GRAY + "Go to page " + (page - 1) : ChatColor.DARK_GRAY + "No previous page"));
-        inventory.setItem(46, createButton(Material.COMPASS, ChatColor.AQUA + "Search Menu", ChatColor.GRAY + "Open the search and filter controls"));
-        inventory.setItem(47, createButton(Material.HOPPER, ChatColor.YELLOW + "Sort By", ChatColor.GRAY + "Cycle the current sort mode"));
-        inventory.setItem(48, createButton(Material.CHEST, ChatColor.GREEN + "Filter Type", ChatColor.GRAY + "Cycle between weapon, armor, head, and item"));
-        inventory.setItem(49, createInfoItem(ChatColor.GOLD + "Page " + page + ChatColor.GRAY + " / " + totalPages));
-        inventory.setItem(50, createButton(Material.BOOK, ChatColor.RED + "Reset", ChatColor.GRAY + "Clear filters and sorting"));
-        inventory.setItem(51, createPane());
-        inventory.setItem(52, createButton(Material.BARRIER, ChatColor.RED + "Close", ChatColor.GRAY + "Close the registry menu"));
-        inventory.setItem(53, createArrow(Material.ARROW, ChatColor.YELLOW + "Next Page", page < totalPages ? ChatColor.GRAY + "Go to page " + (page + 1) : ChatColor.DARK_GRAY + "No next page"));
+        inventory.setItem(SLOT_PREV_PAGE, createArrow(Material.ARROW, ChatColor.YELLOW + "Previous Page", page > 1 ? ChatColor.GRAY + "Go to page " + (page - 1) : ChatColor.DARK_GRAY + "No previous page"));
+        inventory.setItem(SLOT_CONTROLS_MENU, createButton(Material.COMPASS, ChatColor.AQUA + "Search Menu", ChatColor.GRAY + "Open the search and filter controls"));
+        inventory.setItem(SLOT_SORT_CYCLE, createButton(Material.HOPPER, ChatColor.YELLOW + "Sort By", ChatColor.GRAY + "Cycle the current sort mode"));
+        inventory.setItem(SLOT_SPACER, createPane());
+        inventory.setItem(SLOT_PAGE_INFO, createInfoItem(ChatColor.GOLD + "Page " + page + ChatColor.GRAY + " / " + totalPages));
+        inventory.setItem(SLOT_RESET, createButton(Material.BOOK, ChatColor.RED + "Reset", ChatColor.GRAY + "Clear filters and sorting"));
+        inventory.setItem(SLOT_FILLER, createPane());
+        inventory.setItem(SLOT_CLOSE, createButton(Material.BARRIER, ChatColor.RED + "Close", ChatColor.GRAY + "Close the registry menu"));
+        inventory.setItem(SLOT_NEXT_PAGE, createArrow(Material.ARROW, ChatColor.YELLOW + "Next Page", page < totalPages ? ChatColor.GRAY + "Go to page " + (page + 1) : ChatColor.DARK_GRAY + "No next page"));
     }
 
-    private void placeControlsMenu(Inventory inventory, int page, int totalPages, RegistryItemFilter filter, RegistrySortMode sortMode, String searchQuery) {
+    private void placeControlsMenu(Inventory inventory, int page, int totalPages, RegistrySortMode sortMode, String searchQuery) {
         boolean hasSearchQuery = searchQuery != null && !searchQuery.isBlank();
-        inventory.setItem(10, createButton(Material.COMPASS, ChatColor.AQUA + "Search Menu", ChatColor.GRAY + "Browse and refine registry items"));
-        if (hasSearchQuery) {
-            inventory.setItem(11, createButton(Material.PAPER, ChatColor.YELLOW + "Search Query", ChatColor.GRAY + "Current: " + ChatColor.AQUA + searchQuery, ChatColor.GRAY + "Click reset to clear search"));
-        }
-        inventory.setItem(hasSearchQuery ? 12 : 11, createButton(Material.HOPPER, ChatColor.YELLOW + "Sort By", ChatColor.GRAY + "Current: " + ChatColor.AQUA + sortMode.getDisplayName(), ChatColor.GRAY + "Click to cycle sort mode"));
-        inventory.setItem(hasSearchQuery ? 13 : 12, createButton(Material.CHEST, ChatColor.GREEN + "Filter Type", ChatColor.GRAY + "Current: " + ChatColor.AQUA + filter.getDisplayName(), ChatColor.GRAY + "Click to cycle filter type"));
-        inventory.setItem(hasSearchQuery ? 14 : 13, createButton(Material.PAPER, ChatColor.GOLD + "Current Page", ChatColor.GRAY + String.valueOf(page) + " / " + totalPages));
-        inventory.setItem(19, createButton(Material.IRON_SWORD, ChatColor.RED + "Weapon", ChatColor.GRAY + "Filter weapon items"));
-        inventory.setItem(20, createButton(Material.DIAMOND_CHESTPLATE, ChatColor.BLUE + "Armor", ChatColor.GRAY + "Filter armor items"));
-        inventory.setItem(21, createButton(Material.PLAYER_HEAD, ChatColor.WHITE + "Player Heads", ChatColor.GRAY + "Filter player head items"));
-        inventory.setItem(22, createButton(Material.PAPER, ChatColor.GREEN + "All Items", ChatColor.GRAY + "Show everything"));
-        inventory.setItem(23, createButton(Material.BOOK, ChatColor.YELLOW + "Items Only", ChatColor.GRAY + "Filter non-weapon, non-armor, non-head items"));
-        inventory.setItem(29, createButton(Material.NAME_TAG, ChatColor.YELLOW + "Name A-Z", ChatColor.GRAY + "Sort by name ascending"));
-        inventory.setItem(30, createButton(Material.NAME_TAG, ChatColor.YELLOW + "Name Z-A", ChatColor.GRAY + "Sort by name descending"));
-        inventory.setItem(31, createButton(Material.PAPER, ChatColor.AQUA + "Type A-Z", ChatColor.GRAY + "Sort by item type ascending"));
-        inventory.setItem(32, createButton(Material.PAPER, ChatColor.AQUA + "Type Z-A", ChatColor.GRAY + "Sort by item type descending"));
-        inventory.setItem(33, createButton(Material.CLOCK, ChatColor.LIGHT_PURPLE + "Newest", ChatColor.GRAY + "Sort by newest registered"));
-        inventory.setItem(34, createButton(Material.CLOCK, ChatColor.LIGHT_PURPLE + "Oldest", ChatColor.GRAY + "Sort by oldest registered"));
-        inventory.setItem(45, createArrow(Material.ARROW, ChatColor.YELLOW + "Back", ChatColor.GRAY + "Return to the item browser"));
-        inventory.setItem(49, createInfoItem(ChatColor.GOLD + "Controls"));
-        inventory.setItem(52, createButton(Material.BARRIER, ChatColor.RED + "Close", ChatColor.GRAY + "Close the registry menu"));
-        inventory.setItem(53, createArrow(Material.ARROW, ChatColor.YELLOW + "Next Page", page < totalPages ? ChatColor.GRAY + "Go to page " + (page + 1) : ChatColor.DARK_GRAY + "No next page"));
+        String queryValue = hasSearchQuery ? ChatColor.AQUA + searchQuery : ChatColor.DARK_GRAY + "None";
+        String queryHint = hasSearchQuery ? "Click reset to clear search" : "Use /registry search <terms>";
+
+        ItemStack filler = createPane();
+
+        inventory.setItem(SLOT_CONTROLS_HEADER, createButton(Material.COMPASS, ChatColor.AQUA + "Search & Sort", ChatColor.GRAY + "Browse and refine registry items"));
+        inventory.setItem(SLOT_CONTROLS_QUERY, createButton(Material.PAPER, ChatColor.YELLOW + "Search Query", ChatColor.GRAY + "Current: " + queryValue, ChatColor.GRAY + queryHint));
+        inventory.setItem(SLOT_CONTROLS_SORT, createButton(Material.HOPPER, ChatColor.YELLOW + "Sort By", ChatColor.GRAY + "Current: " + ChatColor.AQUA + sortMode.getDisplayName(), ChatColor.GRAY + "Click to cycle sort mode"));
+        inventory.setItem(SLOT_CONTROLS_PAGE, createButton(Material.PAPER, ChatColor.GOLD + "Current Page", ChatColor.GRAY + String.valueOf(page) + " / " + totalPages));
+        inventory.setItem(19, filler);
+        inventory.setItem(20, filler);
+        inventory.setItem(21, filler);
+        inventory.setItem(22, filler);
+        inventory.setItem(23, filler);
+        inventory.setItem(SLOT_SORT_NAME_ASC, createButton(Material.NAME_TAG, ChatColor.YELLOW + "Name A-Z", ChatColor.GRAY + "Sort by name ascending"));
+        inventory.setItem(SLOT_SORT_NAME_DESC, createButton(Material.NAME_TAG, ChatColor.YELLOW + "Name Z-A", ChatColor.GRAY + "Sort by name descending"));
+        inventory.setItem(SLOT_SORT_TYPE_ASC, createButton(Material.PAPER, ChatColor.AQUA + "Type A-Z", ChatColor.GRAY + "Sort by item type ascending"));
+        inventory.setItem(SLOT_SORT_TYPE_DESC, createButton(Material.PAPER, ChatColor.AQUA + "Type Z-A", ChatColor.GRAY + "Sort by item type descending"));
+        inventory.setItem(SLOT_SORT_NEWEST, createButton(Material.CLOCK, ChatColor.LIGHT_PURPLE + "Newest", ChatColor.GRAY + "Sort by newest registered"));
+        inventory.setItem(SLOT_SORT_OLDEST, createButton(Material.CLOCK, ChatColor.LIGHT_PURPLE + "Oldest", ChatColor.GRAY + "Sort by oldest registered"));
+        inventory.setItem(SLOT_PREV_PAGE, createArrow(Material.ARROW, ChatColor.YELLOW + "Back", ChatColor.GRAY + "Return to the item browser"));
+        inventory.setItem(SLOT_PAGE_INFO, createInfoItem(ChatColor.GOLD + "Controls"));
+        inventory.setItem(SLOT_CLOSE, createButton(Material.BARRIER, ChatColor.RED + "Close", ChatColor.GRAY + "Close the registry menu"));
+        inventory.setItem(SLOT_NEXT_PAGE, createArrow(Material.ARROW, ChatColor.YELLOW + "Next Page", page < totalPages ? ChatColor.GRAY + "Go to page " + (page + 1) : ChatColor.DARK_GRAY + "No next page"));
     }
 
     private void fillBackground(Inventory inventory) {
@@ -184,30 +211,33 @@ public final class RegistryMenu {
         return ChatColor.DARK_PURPLE + "Custom Items " + ChatColor.GRAY + "(" + page + "/" + totalPages + ")" + ChatColor.DARK_GRAY + " Search: " + searchQuery;
     }
 
-    private List<CustomItemDefinition> getFilteredDefinitions(RegistryItemFilter filter, RegistrySortMode sortMode, String searchQuery) {
+    private List<CustomItemDefinition> getVisibleDefinitions(RegistrySortMode sortMode, String searchQuery) {
         List<CustomItemDefinition> definitions = new ArrayList<>(registry.getDefinitions());
-        if (filter != null && filter != RegistryItemFilter.ALL) {
-            definitions = definitions.stream()
-                .filter(filter::matches)
-                .collect(Collectors.toList());
-        }
-
         String normalizedQuery = normalizeSearchQuery(searchQuery);
+        Comparator<CustomItemDefinition> comparator = resolveComparator(sortMode);
+
         if (!normalizedQuery.isEmpty()) {
             List<String> tokens = tokenizeSearchQuery(normalizedQuery);
-            definitions = definitions.stream()
-                .filter(definition -> getSearchScore(definition, normalizedQuery, tokens) > 0)
-                .collect(Collectors.toList());
+            List<ScoredDefinition> scoredDefinitions = new ArrayList<>();
+            for (CustomItemDefinition definition : definitions) {
+                int score = getSearchScore(definition, normalizedQuery, tokens);
+                if (score > 0) {
+                    scoredDefinitions.add(new ScoredDefinition(definition, score));
+                }
+            }
 
-            Comparator<CustomItemDefinition> relevanceComparator = Comparator
-                .comparingInt((CustomItemDefinition definition) -> getSearchScore(definition, normalizedQuery, tokens))
-                .reversed();
-            Comparator<CustomItemDefinition> comparator = sortMode == null ? RegistrySortMode.NAME_ASC.getComparator() : sortMode.getComparator();
-            definitions.sort(relevanceComparator.thenComparing(comparator));
-            return definitions;
+            scoredDefinitions.sort(Comparator
+                .comparingInt(ScoredDefinition::getScore)
+                .reversed()
+                .thenComparing(ScoredDefinition::getDefinition, comparator));
+
+            List<CustomItemDefinition> results = new ArrayList<>(scoredDefinitions.size());
+            for (ScoredDefinition entry : scoredDefinitions) {
+                results.add(entry.getDefinition());
+            }
+            return results;
         }
 
-        Comparator<CustomItemDefinition> comparator = sortMode == null ? RegistrySortMode.NAME_ASC.getComparator() : sortMode.getComparator();
         definitions.sort(comparator);
         return definitions;
     }
@@ -217,10 +247,11 @@ public final class RegistryMenu {
             return 0;
         }
 
+        ItemStack itemStack = definition.getItemStack();
         String id = normalizeSearchQuery(definition.getId());
         String displayName = normalizeSearchQuery(definition.getDisplayName());
-        String material = normalizeSearchQuery(definition.getItemStack().getType().name());
-        String lore = normalizeSearchQuery(joinLore(definition));
+        String material = normalizeSearchQuery(itemStack.getType().name());
+        String lore = normalizeSearchQuery(joinLore(itemStack));
 
         int score = 0;
         score += scoreField(id, normalizedQuery, tokens, 500, 350, 50);
@@ -261,8 +292,11 @@ public final class RegistryMenu {
         return score;
     }
 
-    private String joinLore(CustomItemDefinition definition) {
-        ItemStack itemStack = definition.getItemStack();
+    private String joinLore(ItemStack itemStack) {
+        if (itemStack == null) {
+            return "";
+        }
+
         ItemMeta meta = itemStack.getItemMeta();
         if (meta == null || !meta.hasLore()) {
             return "";
@@ -338,5 +372,36 @@ public final class RegistryMenu {
             itemStack.setItemMeta(meta);
         }
         return itemStack;
+    }
+
+    private int calculateTotalPages(int totalItems) {
+        return Math.max(1, (int) Math.ceil(totalItems / (double) CONTENT_SLOTS));
+    }
+
+    private int clampPage(int page, int totalPages) {
+        return Math.max(1, Math.min(page, totalPages));
+    }
+
+    private Comparator<CustomItemDefinition> resolveComparator(RegistrySortMode sortMode) {
+        RegistrySortMode resolved = sortMode == null ? RegistrySortMode.NAME_ASC : sortMode;
+        return resolved.getComparator();
+    }
+
+    private static final class ScoredDefinition {
+        private final CustomItemDefinition definition;
+        private final int score;
+
+        private ScoredDefinition(CustomItemDefinition definition, int score) {
+            this.definition = definition;
+            this.score = score;
+        }
+
+        private CustomItemDefinition getDefinition() {
+            return definition;
+        }
+
+        private int getScore() {
+            return score;
+        }
     }
 }

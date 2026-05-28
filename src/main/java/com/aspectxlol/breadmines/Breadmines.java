@@ -32,6 +32,7 @@ import org.bukkit.plugin.ServicePriority;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.sql.SQLException;
+import java.util.Objects;
 
 /**
  * Breadmines - Main plugin class for both Drop System and Breadmines Skyblock.
@@ -137,7 +138,7 @@ public final class Breadmines extends JavaPlugin {
     private void initializeSkyblockSystem() {
         manaManager = new ManaManager();
         skyblockEnchantmentManager = new SkyblockEnchantmentManager(this);
-        getServer().getServicesManager().register(SkyblockEnchantmentApi.class, skyblockEnchantmentManager, this, ServicePriority.Normal);
+        getServer().getServicesManager().register(SkyblockEnchantmentApi.class, Objects.requireNonNull(skyblockEnchantmentManager), this, ServicePriority.Normal);
 
         // Register Skyblock Commands
         getCommand("mana").setExecutor(new ManaCommand(this));
@@ -160,7 +161,8 @@ public final class Breadmines extends JavaPlugin {
 
         // Start Async Mana Regeneration & Action Bar Scheduler
         startSkyblockStatUpdater();
-        startAsyncManaRegenerator();
+        startManaRegenerator();
+        initializeOnlinePlayers();
 
         getLogger().info(ChatColor.GREEN + "✓ Breadmines Skyblock system initialized!");
     }
@@ -171,7 +173,7 @@ public final class Breadmines extends JavaPlugin {
     private boolean initializeItemRegistry() {
         customItemRegistry = new CustomItemRegistry(this);
         customItemRegistry.load();
-        getServer().getServicesManager().register(CustomItemRegistryApi.class, customItemRegistry, this, ServicePriority.Normal);
+        getServer().getServicesManager().register(CustomItemRegistryApi.class, Objects.requireNonNull(customItemRegistry), this, ServicePriority.Normal);
 
         RegistryCommand registryCommand = new RegistryCommand(this);
         getCommand("registry").setExecutor(registryCommand);
@@ -226,16 +228,20 @@ public final class Breadmines extends JavaPlugin {
     }
 
     /**
-     * Starts an asynchronous background task that runs every 10 ticks (0.5 seconds).
-     * Handles mana regeneration for all online players and sends synchronized action bar HUD.
+     * Runs every 10 ticks (0.5 seconds).
+     * Handles mana regeneration for all online players and sends action bar HUD.
      */
-    private void startAsyncManaRegenerator() {
-        asyncTaskHandle = Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
-            if (!isSystemEnabled) {
+    private void startManaRegenerator() {
+        asyncTaskHandle = Bukkit.getScheduler().runTaskTimer(this, () -> {
+            if (!isSystemEnabled || manaManager == null) {
                 return;
             }
 
             for (Player player : Bukkit.getOnlinePlayers()) {
+                if (player == null || !player.isOnline()) {
+                    continue;
+                }
+
                 double currentMana = manaManager.getMana(player);
                 double maxMana = manaManager.getMaxMana(player);
                 if (currentMana < maxMana) {
@@ -244,13 +250,26 @@ public final class Breadmines extends JavaPlugin {
                 }
 
                 String actionBar = buildActionBarHUD(player);
-                Bukkit.getScheduler().runTask(this, () -> {
-                    if (player != null && player.isOnline()) {
-                        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(actionBar));
-                    }
-                });
+                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(actionBar));
             }
         }, 0L, 10L);
+    }
+
+    private void initializeOnlinePlayers() {
+        if (manaManager == null) {
+            return;
+        }
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player == null) {
+                continue;
+            }
+
+            manaManager.ensurePlayerMana(player);
+            if (skyblockEnchantmentManager != null) {
+                skyblockEnchantmentManager.refreshPlayerStats(player, getBaseManaRegenPerSecond());
+            }
+        }
     }
 
     /**

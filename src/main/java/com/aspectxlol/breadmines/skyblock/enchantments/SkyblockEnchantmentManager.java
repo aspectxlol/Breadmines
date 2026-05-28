@@ -2,9 +2,7 @@ package com.aspectxlol.breadmines.skyblock.enchantments;
 
 import com.aspectxlol.breadmines.Breadmines;
 import com.aspectxlol.breadmines.skyblock.manager.ManaManager;
-import org.bukkit.ChatColor;
 import org.bukkit.NamespacedKey;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
@@ -169,7 +167,6 @@ public class SkyblockEnchantmentManager implements SkyblockEnchantmentApi {
             if (equipment != null) {
                 Collections.addAll(items, equipment.getArmorContents());
                 items.add(equipment.getItemInOffHand());
-                items.add(equipment.getItemInMainHand());
             }
         }
 

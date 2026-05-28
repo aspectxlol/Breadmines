@@ -1,7 +1,6 @@
 package com.aspectxlol.breadmines.drops.listener;
 
 import com.aspectxlol.breadmines.drops.DropSystemHandler;
-import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;

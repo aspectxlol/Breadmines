@@ -7,18 +7,16 @@ public class RegistryMenuHolder implements InventoryHolder {
 
     private final RegistryMenuView view;
     private final int page;
-    private final RegistryItemFilter filter;
     private final RegistrySortMode sortMode;
     private final String searchQuery;
 
-    public RegistryMenuHolder(RegistryMenuView view, int page, RegistryItemFilter filter, RegistrySortMode sortMode) {
-        this(view, page, filter, sortMode, null);
+    public RegistryMenuHolder(RegistryMenuView view, int page, RegistrySortMode sortMode) {
+        this(view, page, sortMode, null);
     }
 
-    public RegistryMenuHolder(RegistryMenuView view, int page, RegistryItemFilter filter, RegistrySortMode sortMode, String searchQuery) {
+    public RegistryMenuHolder(RegistryMenuView view, int page, RegistrySortMode sortMode, String searchQuery) {
         this.view = view;
         this.page = page;
-        this.filter = filter;
         this.sortMode = sortMode;
         this.searchQuery = searchQuery;
     }
@@ -29,10 +27,6 @@ public class RegistryMenuHolder implements InventoryHolder {
 
     public int getPage() {
         return page;
-    }
-
-    public RegistryItemFilter getFilter() {
-        return filter;
     }
 
     public RegistrySortMode getSortMode() {
