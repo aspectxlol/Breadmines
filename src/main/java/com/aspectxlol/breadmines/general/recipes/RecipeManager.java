@@ -34,8 +34,9 @@ public final class RecipeManager {
     private final Breadmines plugin;
     private final CustomItemRegistry itemRegistry;
     private final RecipeRepository repository;
-    private final Map<String, RecipeDefinition> recipes = new ConcurrentHashMap<>();
+    private final Map<String, List<RecipeDefinition>> recipesByOutput = new ConcurrentHashMap<>();
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    private boolean debugMode;
 
     // GitHub sync config
     private final boolean githubEnabled;
@@ -79,9 +80,9 @@ public final class RecipeManager {
     }
 
     public synchronized void load() throws SQLException {
-        recipes.clear();
+        recipesByOutput.clear();
         for (RecipeDefinition definition : repository.fetchAll()) {
-            recipes.put(definition.getOutputKey(), definition);
+            addRecipeToCache(definition);
         }
     }
 
@@ -110,15 +111,15 @@ public final class RecipeManager {
         }
 
         long now = System.currentTimeMillis();
-        RecipeDefinition existing = recipes.get(normalizedOutputKey);
+        RecipeDefinition existing = findExactRecipe(normalizedOutputKey, normalizedInputKey, inputAmount);
         long createdAt = existing != null ? existing.getCreatedAtMillis() : now;
 
         RecipeDefinition recipe = new RecipeDefinition(normalizedOutputKey, normalizedInputKey, inputAmount, createdAt, now);
         repository.upsert(recipe);
-        recipes.put(normalizedOutputKey, recipe);
+        replaceRecipeInCache(recipe);
         if (githubEnabled && githubSyncOnSave) {
             // push asynchronously with descriptive commit message
-            String msg = "Create/Update recipe: " + normalizedOutputKey;
+            String msg = (existing == null ? "Create recipe: " : "Update recipe: ") + normalizedOutputKey + " <= " + inputAmount + "x " + normalizedInputKey;
             plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> pushGithubFile(exportToJson(), null, msg));
         }
         return recipe;
@@ -128,7 +129,7 @@ public final class RecipeManager {
         String normalizedOutputKey = itemRegistry.normalizeName(outputKey);
         boolean removed = repository.delete(normalizedOutputKey);
         if (removed) {
-            recipes.remove(normalizedOutputKey);
+            recipesByOutput.remove(normalizedOutputKey);
             if (githubEnabled && githubSyncOnSave) {
                 String msg = "Delete recipe: " + normalizedOutputKey;
                 plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> pushGithubFile(exportToJson(), null, msg));
@@ -137,20 +138,116 @@ public final class RecipeManager {
         return removed;
     }
 
-    public RecipeDefinition findRecipe(String outputKey) {
-        return recipes.get(itemRegistry.normalizeName(outputKey));
+    public synchronized boolean deleteRecipe(String outputKey, String inputKey, int inputAmount) throws SQLException {
+        String normalizedOutputKey = itemRegistry.normalizeName(outputKey);
+        String normalizedInputKey = itemRegistry.normalizeName(inputKey);
+        boolean removed = repository.delete(normalizedOutputKey, normalizedInputKey, inputAmount);
+        if (removed) {
+            List<RecipeDefinition> recipes = recipesByOutput.get(normalizedOutputKey);
+            if (recipes != null) {
+                recipes.removeIf(recipe -> recipe.getInputKey().equals(normalizedInputKey) && recipe.getInputAmount() == inputAmount);
+                if (recipes.isEmpty()) {
+                    recipesByOutput.remove(normalizedOutputKey);
+                }
+            }
+            if (githubEnabled && githubSyncOnSave) {
+                String msg = "Delete recipe: " + normalizedOutputKey + " <= " + inputAmount + "x " + normalizedInputKey;
+                plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> pushGithubFile(exportToJson(), null, msg));
+            }
+        }
+        return removed;
     }
 
-    public List<RecipeDefinition> getRecipes() {
-        List<RecipeDefinition> list = new ArrayList<>(recipes.values());
-        list.sort(Comparator.comparing(RecipeDefinition::getOutputKey));
+    public RecipeDefinition findRecipe(String outputKey) {
+        List<RecipeDefinition> recipes = recipesByOutput.get(itemRegistry.normalizeName(outputKey));
+        return recipes == null || recipes.isEmpty() ? null : recipes.get(0);
+    }
+
+    public synchronized List<RecipeDefinition> getRecipesForOutput(String outputKey) {
+        List<RecipeDefinition> recipes = recipesByOutput.get(itemRegistry.normalizeName(outputKey));
+        if (recipes == null || recipes.isEmpty()) {
+            return List.of();
+        }
+
+        List<RecipeDefinition> copy = new ArrayList<>(recipes);
+        copy.sort(recipeComparator());
+        return copy;
+    }
+
+    public synchronized List<RecipeDefinition> getRecipes() {
+        List<RecipeDefinition> list = new ArrayList<>();
+        for (List<RecipeDefinition> recipes : recipesByOutput.values()) {
+            list.addAll(recipes);
+        }
+        list.sort(recipeComparator());
         return list;
     }
 
-    public List<String> getRecipeOutputKeys() {
-        List<String> keys = new ArrayList<>(recipes.keySet());
+    public synchronized List<String> getRecipeOutputKeys() {
+        List<String> keys = new ArrayList<>(recipesByOutput.keySet());
         keys.sort(String::compareTo);
         return keys;
+    }
+
+    public boolean isGithubConfigured() {
+        return githubEnabled && githubOwner != null && !githubOwner.isBlank() && githubRepo != null && !githubRepo.isBlank() && githubPath != null && !githubPath.isBlank();
+    }
+
+    public List<String> getGithubConfigurationIssues() {
+        List<String> issues = new ArrayList<>();
+        if (!githubEnabled) {
+            issues.add("recipes.github.enabled is false");
+        }
+        if (githubOwner == null || githubOwner.isBlank()) {
+            issues.add("GitHub owner is missing");
+        }
+        if (githubRepo == null || githubRepo.isBlank()) {
+            issues.add("GitHub repo is missing");
+        }
+        if (githubPath == null || githubPath.isBlank()) {
+            issues.add("GitHub path is missing");
+        }
+        return issues;
+    }
+
+    public List<String> buildInventoryDebugReport(Player player) {
+        List<String> lines = new ArrayList<>();
+        if (player == null) {
+            lines.add("No player selected.");
+            return lines;
+        }
+
+        PlayerInventory inventory = player.getInventory();
+        boolean hasCompressor = hasAutoCompressor(inventory);
+        lines.add("Player: " + player.getName());
+        lines.add("Auto compressor present: " + (hasCompressor ? "yes" : "no"));
+        lines.add("Total recipes loaded: " + getRecipes().size());
+
+        if (!hasCompressor) {
+            lines.add("No autocompressor found in inventory, armor, or offhand.");
+            return lines;
+        }
+
+        for (RecipeDefinition recipe : getRecipes()) {
+            int available = countItemsByRegistryKey(inventory, recipe.getInputKey());
+            boolean outputRegistered = itemRegistry.createItemStack(recipe.getOutputKey()).isPresent();
+            boolean matches = available >= recipe.getInputAmount() && outputRegistered;
+            String status = matches ? "MATCH" : "no match";
+            lines.add(recipe.getOutputKey() + " <= " + recipe.getInputAmount() + "x " + recipe.getInputKey()
+                + " | available=" + available
+                + " | outputRegistered=" + (outputRegistered ? "yes" : "no")
+                + " | " + status);
+        }
+
+        return lines;
+    }
+
+    public synchronized boolean isDebugMode() {
+        return debugMode;
+    }
+
+    public synchronized void setDebugMode(boolean debugMode) {
+        this.debugMode = debugMode;
     }
 
     public void processAutoCompressors() {
@@ -159,7 +256,12 @@ public final class RecipeManager {
                 continue;
             }
             PlayerInventory inventory = player.getInventory();
-            if (!hasAutoCompressor(inventory)) {
+            boolean hasCompressor = hasAutoCompressor(inventory);
+            if (debugMode) {
+                plugin.getLogger().info("[RECIPE DEBUG] Tick scan for " + player.getName() + ": autocompressor=" + (hasCompressor ? "yes" : "no") + ", craftable=" + (hasAnyCraftableRecipe(inventory) ? "yes" : "no"));
+            }
+
+            if (!hasCompressor) {
                 continue;
             }
 
@@ -227,6 +329,8 @@ public final class RecipeManager {
             if (root.isJsonObject() && root.getAsJsonObject().has("recipes")) arr = root.getAsJsonObject().getAsJsonArray("recipes");
             else if (root.isJsonArray()) arr = root.getAsJsonArray();
             if (arr == null) return false;
+            repository.deleteAll();
+            recipesByOutput.clear();
             for (JsonElement e : arr) {
                 if (!e.isJsonObject()) continue;
                 JsonObject o = e.getAsJsonObject();
@@ -236,7 +340,7 @@ public final class RecipeManager {
                 if (output == null || input == null) continue;
                 RecipeDefinition def = new RecipeDefinition(output, input, amt, o.has("created_at_millis") ? o.get("created_at_millis").getAsLong() : System.currentTimeMillis(), o.has("updated_at_millis") ? o.get("updated_at_millis").getAsLong() : System.currentTimeMillis());
                 repository.upsert(def);
-                recipes.put(def.getOutputKey(), def);
+                addRecipeToCache(def);
             }
             return true;
         } catch (Exception ex) {
@@ -339,8 +443,6 @@ public final class RecipeManager {
         return GITHUB_API_BASE + "/repos/" + githubOwner + "/" + githubRepo + "/contents/" + encodedPath + "?ref=" + encodedBranch;
     }
 
-    private boolean isGithubConfigured() { return githubEnabled && githubOwner != null && !githubOwner.isBlank() && githubRepo != null && !githubRepo.isBlank() && githubPath != null && !githubPath.isBlank(); }
-
     private String loadGithubToken() {
         String token = plugin.getConfig().getString("recipes.github.token", "");
         if (token == null || token.isBlank()) {
@@ -353,13 +455,46 @@ public final class RecipeManager {
 
     private boolean isSameJson(String left, String right) { if (left == null || right == null) return false; try { JsonElement l = gson.fromJson(left, JsonElement.class); JsonElement r = gson.fromJson(right, JsonElement.class); if (l == null || r == null) return left.equals(right); return l.equals(r); } catch (Exception e) { return left.equals(right); } }
 
+    private void addRecipeToCache(RecipeDefinition definition) {
+        recipesByOutput.computeIfAbsent(definition.getOutputKey(), key -> new ArrayList<>()).add(definition);
+    }
+
+    private void replaceRecipeInCache(RecipeDefinition definition) {
+        List<RecipeDefinition> recipes = recipesByOutput.computeIfAbsent(definition.getOutputKey(), key -> new ArrayList<>());
+        recipes.removeIf(recipe -> recipe.getInputKey().equals(definition.getInputKey()) && recipe.getInputAmount() == definition.getInputAmount());
+        recipes.add(definition);
+        recipes.sort(recipeComparator());
+    }
+
+    private RecipeDefinition findExactRecipe(String outputKey, String inputKey, int inputAmount) {
+        List<RecipeDefinition> recipes = recipesByOutput.get(outputKey);
+        if (recipes == null) {
+            return null;
+        }
+
+        for (RecipeDefinition recipe : recipes) {
+            if (recipe.getInputKey().equals(inputKey) && recipe.getInputAmount() == inputAmount) {
+                return recipe;
+            }
+        }
+
+        return null;
+    }
+
+    private Comparator<RecipeDefinition> recipeComparator() {
+        return Comparator
+            .comparing(RecipeDefinition::getOutputKey)
+            .thenComparing(RecipeDefinition::getInputKey)
+            .thenComparingInt(RecipeDefinition::getInputAmount);
+    }
+
     private static final class GitHubFile { private final String sha; private final String content; private GitHubFile(String sha, String content) { this.sha = sha; this.content = content; } }
     private static final class GitHubResponse { private final int status; private final String body; private GitHubResponse(int status, String body) { this.status = status; this.body = body; } }
 
     private String sanitizeSegment(String value) { if (value == null) return ""; return value.trim(); }
     private String sanitizePath(String path) { if (path == null) return ""; String normalized = path.trim().replace("\\", "/"); while (normalized.startsWith("/")) normalized = normalized.substring(1); return normalized; }
 
-    private boolean hasAutoCompressor(PlayerInventory inventory) {
+    public boolean hasAutoCompressor(PlayerInventory inventory) {
         for (ItemStack itemStack : inventory.getContents()) {
             if (isRegistryKey(itemStack, AUTO_COMPRESSOR_KEY)) {
                 return true;
@@ -387,9 +522,18 @@ public final class RecipeManager {
     }
 
     private void processPlayerRecipes(Player player, PlayerInventory inventory) {
+        if (debugMode) {
+            plugin.getLogger().info("[RECIPE DEBUG] Processing auto compressor for " + player.getName() + " with " + getRecipes().size() + " configured recipes.");
+        }
+
+        boolean matchedAnyRecipe = false;
+
         for (RecipeDefinition recipe : getRecipes()) {
             Optional<ItemStack> outputTemplate = itemRegistry.createItemStack(recipe.getOutputKey());
             if (outputTemplate.isEmpty()) {
+                if (debugMode) {
+                    plugin.getLogger().info("[RECIPE DEBUG] Skipping recipe " + recipe.getOutputKey() + " <= " + recipe.getInputAmount() + "x " + recipe.getInputKey() + " because output item is not registered.");
+                }
                 continue;
             }
 
@@ -398,11 +542,23 @@ public final class RecipeManager {
 
             int available = countItemsByRegistryKey(inventory, recipe.getInputKey());
             if (available < recipe.getInputAmount()) {
+                if (debugMode) {
+                    plugin.getLogger().info("[RECIPE DEBUG] Not enough input for " + recipe.getOutputKey() + " <= " + recipe.getInputAmount() + "x " + recipe.getInputKey() + " (available=" + available + ")");
+                }
                 continue;
+            }
+
+            matchedAnyRecipe = true;
+
+            if (debugMode) {
+                plugin.getLogger().info("[RECIPE DEBUG] Matching recipe " + recipe.getOutputKey() + " <= " + recipe.getInputAmount() + "x " + recipe.getInputKey() + " (available=" + available + ")");
             }
 
             while (available >= recipe.getInputAmount() && canFitOneOutput(inventory, output)) {
                 if (!consumeItemsByRegistryKey(inventory, recipe.getInputKey(), recipe.getInputAmount())) {
+                    if (debugMode) {
+                        plugin.getLogger().info("[RECIPE DEBUG] Stopped crafting " + recipe.getOutputKey() + " because the input item could not be consumed.");
+                    }
                     break;
                 }
 
@@ -411,9 +567,35 @@ public final class RecipeManager {
                     leftovers.values().forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
                 }
 
+                if (debugMode) {
+                    plugin.getLogger().info("[RECIPE DEBUG] Crafted 1x " + recipe.getOutputKey() + " from " + recipe.getInputAmount() + "x " + recipe.getInputKey() + " for " + player.getName());
+                }
+
                 available -= recipe.getInputAmount();
             }
+
+            if (debugMode && !canFitOneOutput(inventory, output)) {
+                plugin.getLogger().info("[RECIPE DEBUG] Inventory had no room for " + recipe.getOutputKey() + " after processing.");
+            }
         }
+
+        if (debugMode && !matchedAnyRecipe) {
+            plugin.getLogger().info("[RECIPE DEBUG] No craftable recipe matched player inventory for " + player.getName() + ".");
+        }
+    }
+
+    private boolean hasAnyCraftableRecipe(PlayerInventory inventory) {
+        for (RecipeDefinition recipe : getRecipes()) {
+            if (itemRegistry.createItemStack(recipe.getOutputKey()).isEmpty()) {
+                continue;
+            }
+
+            if (countItemsByRegistryKey(inventory, recipe.getInputKey()) >= recipe.getInputAmount()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private int countItemsByRegistryKey(PlayerInventory inventory, String key) {

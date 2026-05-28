@@ -19,6 +19,7 @@ public final class GitHubConfig {
     public GitHubConfig(JavaPlugin plugin, String sectionPrefix, String defaultPath) {
         // Global fallback: top-level 'github' section
         String globalPrefix = "github";
+        String registryPrefix = "registry.github";
 
         String enabledKey = sectionPrefix + ".github.enabled";
         String ownerKey = sectionPrefix + ".github.owner";
@@ -29,14 +30,30 @@ public final class GitHubConfig {
         String syncStartupKey = sectionPrefix + ".github.syncOnStartup";
         String syncSaveKey = sectionPrefix + ".github.syncOnSave";
 
-        boolean cfgEnabled = plugin.getConfig().getBoolean(enabledKey, plugin.getConfig().getBoolean(globalPrefix + ".enabled", false));
-        String cfgOwner = plugin.getConfig().getString(ownerKey, plugin.getConfig().getString(globalPrefix + ".owner", ""));
-        String cfgRepo = plugin.getConfig().getString(repoKey, plugin.getConfig().getString(globalPrefix + ".repo", ""));
-        String cfgBranch = plugin.getConfig().getString(branchKey, plugin.getConfig().getString(globalPrefix + ".branch", "main"));
-        String cfgPath = plugin.getConfig().getString(pathKey, plugin.getConfig().getString(globalPrefix + ".path", defaultPath == null ? "" : defaultPath));
-        String cfgToken = plugin.getConfig().getString(tokenKey, plugin.getConfig().getString(globalPrefix + ".token", ""));
-        boolean cfgSyncStartup = plugin.getConfig().getBoolean(syncStartupKey, plugin.getConfig().getBoolean(globalPrefix + ".syncOnStartup", false));
-        boolean cfgSyncSave = plugin.getConfig().getBoolean(syncSaveKey, plugin.getConfig().getBoolean(globalPrefix + ".syncOnSave", false));
+        boolean cfgEnabled = plugin.getConfig().getBoolean(enabledKey,
+            plugin.getConfig().getBoolean(globalPrefix + ".enabled",
+                plugin.getConfig().getBoolean(registryPrefix + ".enabled", false)));
+        String cfgOwner = plugin.getConfig().getString(ownerKey,
+            plugin.getConfig().getString(globalPrefix + ".owner",
+                plugin.getConfig().getString(registryPrefix + ".owner", "")));
+        String cfgRepo = plugin.getConfig().getString(repoKey,
+            plugin.getConfig().getString(globalPrefix + ".repo",
+                plugin.getConfig().getString(registryPrefix + ".repo", "")));
+        String cfgBranch = plugin.getConfig().getString(branchKey,
+            plugin.getConfig().getString(globalPrefix + ".branch",
+                plugin.getConfig().getString(registryPrefix + ".branch", "main")));
+        String cfgPath = plugin.getConfig().getString(pathKey,
+            plugin.getConfig().getString(globalPrefix + ".path",
+                defaultPath == null ? "" : defaultPath));
+        String cfgToken = plugin.getConfig().getString(tokenKey,
+            plugin.getConfig().getString(globalPrefix + ".token",
+                plugin.getConfig().getString(registryPrefix + ".token", "")));
+        boolean cfgSyncStartup = plugin.getConfig().getBoolean(syncStartupKey,
+            plugin.getConfig().getBoolean(globalPrefix + ".syncOnStartup",
+                plugin.getConfig().getBoolean(registryPrefix + ".syncOnStartup", false)));
+        boolean cfgSyncSave = plugin.getConfig().getBoolean(syncSaveKey,
+            plugin.getConfig().getBoolean(globalPrefix + ".syncOnSave",
+                plugin.getConfig().getBoolean(registryPrefix + ".syncOnSave", false)));
 
         // fallback to secrets.yml for token if blank
         if (cfgToken == null || cfgToken.isBlank()) {
@@ -44,7 +61,8 @@ public final class GitHubConfig {
             if (secretsFile.exists()) {
                 YamlConfiguration secrets = YamlConfiguration.loadConfiguration(secretsFile);
                 // check section-specific then global
-                String secToken = secrets.getString(tokenKey, secrets.getString(globalPrefix + ".token", ""));
+                String secToken = secrets.getString(tokenKey,
+                    secrets.getString(globalPrefix + ".token", secrets.getString(registryPrefix + ".token", "")));
                 if (secToken != null && !secToken.isBlank()) cfgToken = secToken.trim();
             }
         }

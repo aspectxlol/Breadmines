@@ -35,7 +35,7 @@ public class DropTabCompleter implements TabCompleter {
 
         if (label.equalsIgnoreCase("drops")) {
             if (args.length == 1) {
-                completions.addAll(Arrays.asList("create", "set", "update", "delete", "remove", "read", "info", "debug"));
+                completions.addAll(Arrays.asList("create", "set", "update", "delete", "remove", "read", "info", "debug", "sync"));
             } else if (args.length == 2) {
                 String action = args[0].toLowerCase();
                 if (action.equals("delete") || action.equals("remove") || action.equals("read") || action.equals("info")) {

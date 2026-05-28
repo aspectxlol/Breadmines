@@ -7,7 +7,7 @@ softdepend: [Skript]
 commands:
   drops:
     description: "Manage custom block drops"
-    usage: "/drops <create|delete|read> <block_name> [item_id]"
+    usage: "/drops <create|delete|read|debug|sync> <block_name> [item_id]"
     permission: admin.setup
   dropslist:
     description: "List all registered block drops with pagination"
@@ -32,7 +32,7 @@ commands:
     aliases: [itemregistry, itemreg, reg]
   recipe:
     description: "Manage autocompressor recipes"
-    usage: "/recipe <create|update|delete|list|info> ..."
+    usage: "/recipe <create|update|delete|list|info|sync|debug> ..."
     permission: breadmines.recipe
     aliases: [recipes, rcp, rec]
 

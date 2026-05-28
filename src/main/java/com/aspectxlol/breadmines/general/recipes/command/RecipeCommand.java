@@ -23,7 +23,7 @@ import java.util.Locale;
 
 public final class RecipeCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> SUBCOMMANDS = Arrays.asList("create", "update", "delete", "remove", "list", "ls", "info", "sync");
+    private static final List<String> SUBCOMMANDS = Arrays.asList("create", "update", "delete", "remove", "list", "ls", "info", "sync", "debug");
 
     private final Breadmines plugin;
     private final RecipeManager recipeManager;
@@ -64,6 +64,8 @@ public final class RecipeCommand implements CommandExecutor, TabCompleter {
                     return handleList(sender);
                 case "info":
                     return handleInfo(sender, label, args);
+                case "debug":
+                    return handleDebug(sender, label, args);
                 default:
                     sender.sendMessage(ChatColor.RED + "Unknown action: " + args[0]);
                     sendUsage(sender, label);
@@ -99,13 +101,29 @@ public final class RecipeCommand implements CommandExecutor, TabCompleter {
             if (action.equals("delete") || action.equals("remove") || action.equals("info")) {
                 return filterByPrefix(args[1], recipeManager.getRecipeOutputKeys());
             }
+
+            if (action.equals("debug")) {
+                return filterByPrefix(args[1], Arrays.asList("status", "list", "check", "toggle", "inventory"));
+            }
         }
 
-        if (args.length == 3 && (action.equals("create") || action.equals("update"))) {
+        if (args.length == 3 && (action.equals("create") || action.equals("update") || action.equals("delete") || action.equals("remove"))) {
             return List.of("1", "2", "4", "8", "16", "32", "64");
         }
 
+        if (args.length == 3 && (action.equals("delete") || action.equals("remove") || action.equals("info") || action.equals("debug"))) {
+            if (action.equals("debug")) {
+                return filterByPrefix(args[2], recipeManager.getRecipeOutputKeys());
+            }
+
+            return filterByPrefix(args[2], getRegistryKeys());
+        }
+
         if (args.length == 4 && (action.equals("create") || action.equals("update"))) {
+            return filterByPrefix(args[3], getRegistryKeys());
+        }
+
+        if (args.length == 4 && (action.equals("delete") || action.equals("remove"))) {
             return filterByPrefix(args[3], getRegistryKeys());
         }
 
@@ -132,6 +150,8 @@ public final class RecipeCommand implements CommandExecutor, TabCompleter {
 
         sender.sendMessage(ChatColor.GREEN + "✓ Recipe saved: " + ChatColor.AQUA + recipe.getOutputKey() + ChatColor.GRAY
             + " <= " + ChatColor.AQUA + recipe.getInputAmount() + "x " + recipe.getInputKey());
+        List<RecipeDefinition> recipesForOutput = recipeManager.getRecipesForOutput(outputKey);
+        sender.sendMessage(ChatColor.GRAY + "Total recipes for output: " + ChatColor.AQUA + recipesForOutput.size());
         return true;
     }
 
@@ -142,8 +162,27 @@ public final class RecipeCommand implements CommandExecutor, TabCompleter {
         }
 
         String outputKey = args[1];
+        if (args.length >= 4) {
+            int inputAmount;
+            try {
+                inputAmount = Integer.parseInt(args[2]);
+            } catch (NumberFormatException exception) {
+                sender.sendMessage(ChatColor.RED + "Input amount must be a whole number.");
+                return true;
+            }
+
+            String inputKey = args[3];
+            if (recipeManager.deleteRecipe(outputKey, inputKey, inputAmount)) {
+                sender.sendMessage(ChatColor.GREEN + "✓ Deleted recipe " + ChatColor.AQUA + itemRegistry.normalizeName(outputKey)
+                    + ChatColor.GRAY + " <= " + ChatColor.AQUA + inputAmount + "x " + itemRegistry.normalizeName(inputKey));
+            } else {
+                sender.sendMessage(ChatColor.RED + "No matching recipe found for output " + outputKey + ", input " + inputAmount + "x " + inputKey);
+            }
+            return true;
+        }
+
         if (recipeManager.deleteRecipe(outputKey)) {
-            sender.sendMessage(ChatColor.GREEN + "✓ Deleted recipe for output key " + ChatColor.AQUA + itemRegistry.normalizeName(outputKey));
+            sender.sendMessage(ChatColor.GREEN + "✓ Deleted all recipes for output key " + ChatColor.AQUA + itemRegistry.normalizeName(outputKey));
         } else {
             sender.sendMessage(ChatColor.RED + "No recipe found for output key " + outputKey);
         }
@@ -172,9 +211,18 @@ public final class RecipeCommand implements CommandExecutor, TabCompleter {
             if (ok) {
                 sender.sendMessage(ChatColor.GREEN + "✓ Recipes synchronized with GitHub. Total: " + recipeManager.getRecipes().size());
             } else {
-                // fallback: reload local DB
+                if (!recipeManager.isGithubConfigured()) {
+                    sender.sendMessage(ChatColor.YELLOW + "⚠ Recipe sync is not configured yet.");
+                    for (String issue : recipeManager.getGithubConfigurationIssues()) {
+                        sender.sendMessage(ChatColor.YELLOW + " - " + issue);
+                    }
+                    sender.sendMessage(ChatColor.YELLOW + "Configure `recipes.github.enabled`, `recipes.github.path`, and the shared GitHub owner/repo/branch in `config.yml`.");
+                } else {
+                    sender.sendMessage(ChatColor.YELLOW + "⚠ Recipes sync failed. Check your GitHub token, repo access, and network connection.");
+                }
+
                 recipeManager.load();
-                sender.sendMessage(ChatColor.YELLOW + "⚠ Recipes sync not configured or skipped; reloaded local DB. Total: " + recipeManager.getRecipes().size());
+                sender.sendMessage(ChatColor.YELLOW + "Reloaded local recipe database. Total: " + recipeManager.getRecipes().size());
             }
         } catch (SQLException e) {
             sender.sendMessage(ChatColor.RED + "Recipe database error: " + e.getMessage());
@@ -189,14 +237,101 @@ public final class RecipeCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        RecipeDefinition recipe = recipeManager.findRecipe(args[1]);
-        if (recipe == null) {
+        List<RecipeDefinition> recipes = recipeManager.getRecipesForOutput(args[1]);
+        if (recipes.isEmpty()) {
             sender.sendMessage(ChatColor.RED + "No recipe found for output key " + args[1]);
             return true;
         }
 
-        sender.sendMessage(ChatColor.GOLD + "Recipe " + recipe.getOutputKey());
-        sender.sendMessage(ChatColor.GRAY + "Input: " + ChatColor.AQUA + recipe.getInputAmount() + "x " + recipe.getInputKey());
+        sender.sendMessage(ChatColor.GOLD + "Recipes for " + itemRegistry.normalizeName(args[1]) + ChatColor.GRAY + " (" + recipes.size() + ")");
+        for (RecipeDefinition recipe : recipes) {
+            sender.sendMessage(ChatColor.GRAY + " - " + ChatColor.AQUA + recipe.getInputAmount() + "x " + recipe.getInputKey());
+        }
+        return true;
+    }
+
+    private boolean handleDebug(CommandSender sender, String label, String[] args) throws SQLException {
+        if (args.length == 1) {
+            recipeManager.setDebugMode(!recipeManager.isDebugMode());
+            sender.sendMessage(ChatColor.GREEN + "✓ Recipe debug mode " + (recipeManager.isDebugMode() ? "enabled" : "disabled"));
+            return true;
+        }
+
+        String debugAction = args[1].toLowerCase(Locale.ROOT);
+        if (debugAction.equals("toggle")) {
+            recipeManager.setDebugMode(!recipeManager.isDebugMode());
+            sender.sendMessage(ChatColor.GREEN + "✓ Recipe debug mode " + (recipeManager.isDebugMode() ? "enabled" : "disabled"));
+            return true;
+        }
+
+        if (debugAction.equals("status")) {
+            sender.sendMessage(ChatColor.GOLD + "=== Recipe Debug Status ===");
+            sender.sendMessage(ChatColor.GREEN + "Debug mode: " + (recipeManager.isDebugMode() ? "enabled" : "disabled"));
+            sender.sendMessage(ChatColor.GREEN + "Total recipes: " + recipeManager.getRecipes().size());
+            sender.sendMessage(ChatColor.GREEN + "Recipe outputs: " + recipeManager.getRecipeOutputKeys().size());
+            return true;
+        }
+
+        if (debugAction.equals("inventory")) {
+            Player player = CommandUtils.requirePlayer(sender);
+            if (player == null) {
+                sender.sendMessage(ChatColor.RED + "Use this in-game so I can inspect your inventory.");
+                return true;
+            }
+
+            sender.sendMessage(ChatColor.GOLD + "=== Recipe Inventory Debug: " + player.getName() + " ===");
+            for (String line : recipeManager.buildInventoryDebugReport(player)) {
+                sender.sendMessage(ChatColor.GRAY + line);
+            }
+            return true;
+        }
+
+        if (debugAction.equals("list")) {
+            if (args.length >= 3) {
+                List<RecipeDefinition> recipes = recipeManager.getRecipesForOutput(args[2]);
+                sender.sendMessage(ChatColor.GOLD + "=== Recipe Debug List: " + itemRegistry.normalizeName(args[2]) + " ===");
+                if (recipes.isEmpty()) {
+                    sender.sendMessage(ChatColor.RED + "No recipes found for that output.");
+                    return true;
+                }
+                for (RecipeDefinition recipe : recipes) {
+                    sender.sendMessage(ChatColor.AQUA + recipe.getOutputKey() + ChatColor.GRAY + " <= " + ChatColor.AQUA + recipe.getInputAmount() + "x " + recipe.getInputKey());
+                }
+                return true;
+            }
+
+            sender.sendMessage(ChatColor.GOLD + "=== All Recipes ===");
+            for (RecipeDefinition recipe : recipeManager.getRecipes()) {
+                sender.sendMessage(ChatColor.AQUA + recipe.getOutputKey() + ChatColor.GRAY + " <= " + ChatColor.AQUA + recipe.getInputAmount() + "x " + recipe.getInputKey());
+            }
+            return true;
+        }
+
+        if (debugAction.equals("check")) {
+            if (args.length < 3) {
+                sender.sendMessage(ChatColor.RED + "Usage: /" + label + " debug check <output>");
+                return true;
+            }
+
+            List<RecipeDefinition> recipes = recipeManager.getRecipesForOutput(args[2]);
+            sender.sendMessage(ChatColor.GOLD + "=== Debug Check: " + itemRegistry.normalizeName(args[2]) + " ===");
+            if (recipes.isEmpty()) {
+                sender.sendMessage(ChatColor.RED + "No recipes found for that output.");
+                return true;
+            }
+
+            for (RecipeDefinition recipe : recipes) {
+                sender.sendMessage(ChatColor.GREEN + "Output: " + recipe.getOutputKey());
+                sender.sendMessage(ChatColor.GRAY + "Input: " + ChatColor.AQUA + recipe.getInputAmount() + "x " + recipe.getInputKey());
+            }
+            return true;
+        }
+
+        sender.sendMessage(ChatColor.YELLOW + "/" + label + " debug - toggle debug mode");
+        sender.sendMessage(ChatColor.YELLOW + "/" + label + " debug status - show debug status");
+        sender.sendMessage(ChatColor.YELLOW + "/" + label + " debug list [output] - list all recipes or recipes for one output");
+        sender.sendMessage(ChatColor.YELLOW + "/" + label + " debug check <output> - inspect recipes for an output");
+        sender.sendMessage(ChatColor.YELLOW + "/" + label + " debug inventory - inspect your inventory against all recipes");
         return true;
     }
 
@@ -205,8 +340,11 @@ public final class RecipeCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ChatColor.YELLOW + "/" + label + " create <output> <input_amount_needed> <input>");
         sender.sendMessage(ChatColor.YELLOW + "/" + label + " update <output> <input_amount_needed> <input>");
         sender.sendMessage(ChatColor.YELLOW + "/" + label + " delete <output>");
+        sender.sendMessage(ChatColor.YELLOW + "/" + label + " delete <output> <input_amount_needed> <input> - delete one exact recipe");
         sender.sendMessage(ChatColor.YELLOW + "/" + label + " list");
         sender.sendMessage(ChatColor.YELLOW + "/" + label + " info <output>");
+        sender.sendMessage(ChatColor.YELLOW + "/" + label + " debug - toggle recipe debug mode");
+        sender.sendMessage(ChatColor.YELLOW + "/" + label + " debug inventory - inspect your inventory against all recipes");
     }
 
     private List<String> getRegistryKeys() {

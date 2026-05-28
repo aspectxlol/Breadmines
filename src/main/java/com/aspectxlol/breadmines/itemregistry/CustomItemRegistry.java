@@ -278,7 +278,52 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
 
         PersistentDataContainer container = meta.getPersistentDataContainer();
         String id = container.get(registryKey, PersistentDataType.STRING);
-        return Optional.ofNullable(id);
+        if (id != null && !id.isBlank()) {
+            return Optional.of(id);
+        }
+
+        String exactId = findDefinitionIdByExactStack(itemStack);
+        if (exactId != null && !exactId.isBlank()) {
+            return Optional.of(exactId);
+        }
+
+        String fallbackId = findDefinitionIdBySimilarity(itemStack);
+        return Optional.ofNullable(fallbackId);
+    }
+
+    private String findDefinitionIdByExactStack(ItemStack itemStack) {
+        ItemStack normalizedCandidate = itemStack.clone();
+        normalizedCandidate.setAmount(1);
+
+        for (CustomItemDefinition definition : definitions.values()) {
+            ItemStack definitionStack = definition.getItemStack();
+            if (definitionStack == null) {
+                continue;
+            }
+
+            ItemStack normalizedDefinition = definitionStack.clone();
+            normalizedDefinition.setAmount(1);
+            if (normalizedCandidate.serialize().equals(normalizedDefinition.serialize())) {
+                return definition.getId();
+            }
+        }
+
+        return null;
+    }
+
+    private String findDefinitionIdBySimilarity(ItemStack itemStack) {
+        for (CustomItemDefinition definition : definitions.values()) {
+            ItemStack definitionStack = definition.getItemStack();
+            if (definitionStack == null) {
+                continue;
+            }
+
+            if (itemStack.isSimilar(definitionStack)) {
+                return definition.getId();
+            }
+        }
+
+        return null;
     }
 
     public boolean isRegistryItem(ItemStack itemStack) {
