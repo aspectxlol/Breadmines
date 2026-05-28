@@ -599,23 +599,62 @@ public final class RecipeManager {
     }
 
     private int countItemsByRegistryKey(PlayerInventory inventory, String key) {
-        int total = 0;
-        for (ItemStack stack : inventory.getStorageContents()) {
-            if (stack == null) {
-                continue;
-            }
-
-            if (isRegistryKey(stack, key)) {
-                total += stack.getAmount();
-            }
-        }
-        return total;
+        return countItemsByRegistryKey(inventory.getStorageContents(), inventory.getArmorContents(), inventory.getItemInOffHand(), key);
     }
 
     private boolean consumeItemsByRegistryKey(PlayerInventory inventory, String key, int amount) {
         int remaining = amount;
-        ItemStack[] contents = inventory.getStorageContents();
+        remaining = consumeFromArray(inventory.getStorageContents(), inventory::setStorageContents, remaining, key);
+        if (remaining == 0) {
+            return true;
+        }
 
+        remaining = consumeFromArray(inventory.getArmorContents(), inventory::setArmorContents, remaining, key);
+        if (remaining == 0) {
+            return true;
+        }
+
+        if (isRegistryKey(inventory.getItemInOffHand(), key)) {
+            ItemStack offHand = inventory.getItemInOffHand();
+            if (offHand != null) {
+                int stackAmount = offHand.getAmount();
+                if (stackAmount <= remaining) {
+                    inventory.setItemInOffHand(null);
+                    remaining -= stackAmount;
+                } else {
+                    offHand.setAmount(stackAmount - remaining);
+                    inventory.setItemInOffHand(offHand);
+                    remaining = 0;
+                }
+            }
+        }
+
+        return remaining == 0;
+    }
+
+    private int countItemsByRegistryKey(ItemStack[] storageContents, ItemStack[] armorContents, ItemStack offHand, String key) {
+        int total = 0;
+        for (ItemStack stack : storageContents) {
+            if (stack != null && isRegistryKey(stack, key)) {
+                total += stack.getAmount();
+            }
+        }
+
+        for (ItemStack stack : armorContents) {
+            if (stack != null && isRegistryKey(stack, key)) {
+                total += stack.getAmount();
+            }
+        }
+
+        if (offHand != null && isRegistryKey(offHand, key)) {
+            total += offHand.getAmount();
+        }
+
+        return total;
+    }
+
+    private int consumeFromArray(ItemStack[] contents, java.util.function.Consumer<ItemStack[]> setter, int amount, String key) {
+        int remaining = amount;
         for (int slot = 0; slot < contents.length; slot++) {
             ItemStack stack = contents[slot];
             if (stack == null || !isRegistryKey(stack, key)) {
@@ -633,13 +672,13 @@ public final class RecipeManager {
             }
 
             if (remaining == 0) {
-                inventory.setStorageContents(contents);
-                return true;
+                setter.accept(contents);
+                return 0;
             }
         }
 
-        inventory.setStorageContents(contents);
-        return false;
+        setter.accept(contents);
+        return remaining;
     }
 
     private boolean canFitOneOutput(PlayerInventory inventory, ItemStack output) {
