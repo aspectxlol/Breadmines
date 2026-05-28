@@ -3,24 +3,26 @@ package com.aspectxlol.breadmines.itemregistry.gui;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 
-public class RegistryMenuHolder implements InventoryHolder {
+public class RegistryEntryMenuHolder implements InventoryHolder {
 
-    private final int page;
+    private final String registryKey;
+    private final int returnPage;
     private final RegistrySortMode sortMode;
     private final String searchQuery;
 
-    public RegistryMenuHolder(int page, RegistrySortMode sortMode) {
-        this(page, sortMode, null);
-    }
-
-    public RegistryMenuHolder(int page, RegistrySortMode sortMode, String searchQuery) {
-        this.page = page;
+    public RegistryEntryMenuHolder(String registryKey, int returnPage, RegistrySortMode sortMode, String searchQuery) {
+        this.registryKey = registryKey;
+        this.returnPage = returnPage;
         this.sortMode = sortMode;
         this.searchQuery = searchQuery;
     }
 
-    public int getPage() {
-        return page;
+    public String getRegistryKey() {
+        return registryKey;
+    }
+
+    public int getReturnPage() {
+        return returnPage;
     }
 
     public RegistrySortMode getSortMode() {

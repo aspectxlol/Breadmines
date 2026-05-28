@@ -170,6 +170,53 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
         });
     }
 
+    public synchronized Optional<CustomItemDefinition> updateItem(String name, ItemStack itemStack, String source) {
+        if (itemStack == null || itemStack.getType() == Material.AIR) {
+            throw new IllegalArgumentException("Held item is empty or invalid.");
+        }
+
+        String normalizedName = normalizeName(name);
+        CustomItemDefinition existing = definitions.get(normalizedName);
+        if (existing == null) {
+            return Optional.empty();
+        }
+
+        ItemStack snapshot = itemStack.clone();
+        String displayName = resolveDisplayName(snapshot, normalizedName);
+        String resolvedSource = source == null || source.isBlank() ? existing.getSource() : source;
+        CustomItemDefinition updated = new CustomItemDefinition(existing.getId(), displayName, snapshot, existing.getCreatedAtMillis(), resolvedSource);
+        definitions.put(normalizedName, updated);
+        save();
+        return Optional.of(updated);
+    }
+
+    public synchronized Optional<CustomItemDefinition> renameItem(String oldName, String newName) {
+        String normalizedOldName = normalizeName(oldName);
+        CustomItemDefinition existing = definitions.get(normalizedOldName);
+        if (existing == null) {
+            return Optional.empty();
+        }
+
+        String normalizedNewName = normalizeName(newName);
+        if (normalizedNewName.isEmpty()) {
+            throw new IllegalArgumentException("Registry key cannot be empty.");
+        }
+
+        if (normalizedOldName.equals(normalizedNewName)) {
+            return Optional.of(existing);
+        }
+
+        if (definitions.containsKey(normalizedNewName)) {
+            throw new IllegalArgumentException("Registry key already exists: " + normalizedNewName);
+        }
+
+        CustomItemDefinition renamed = new CustomItemDefinition(normalizedNewName, existing.getDisplayName(), existing.getItemStack(), existing.getCreatedAtMillis(), existing.getSource());
+        definitions.remove(normalizedOldName);
+        definitions.put(normalizedNewName, renamed);
+        save();
+        return Optional.of(renamed);
+    }
+
     @Override
     public synchronized boolean removeItem(String name) {
         String normalizedName = normalizeName(name);

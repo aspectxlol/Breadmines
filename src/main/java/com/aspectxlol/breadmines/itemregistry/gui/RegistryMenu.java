@@ -23,26 +23,14 @@ public final class RegistryMenu {
     static final int CONTENT_SLOTS = 45;
 
     static final int SLOT_PREV_PAGE = 45;
-    static final int SLOT_CONTROLS_MENU = 46;
-    static final int SLOT_SORT_CYCLE = 47;
-    static final int SLOT_SPACER = 48;
+    static final int SLOT_SEARCH = 46;
+    static final int SLOT_SORT = 47;
+    static final int SLOT_QUERY = 48;
     static final int SLOT_PAGE_INFO = 49;
     static final int SLOT_RESET = 50;
     static final int SLOT_FILLER = 51;
     static final int SLOT_CLOSE = 52;
     static final int SLOT_NEXT_PAGE = 53;
-
-    static final int SLOT_CONTROLS_HEADER = 10;
-    static final int SLOT_CONTROLS_QUERY = 11;
-    static final int SLOT_CONTROLS_SORT = 12;
-    static final int SLOT_CONTROLS_PAGE = 13;
-
-    static final int SLOT_SORT_NAME_ASC = 29;
-    static final int SLOT_SORT_NAME_DESC = 30;
-    static final int SLOT_SORT_TYPE_ASC = 31;
-    static final int SLOT_SORT_TYPE_DESC = 32;
-    static final int SLOT_SORT_NEWEST = 33;
-    static final int SLOT_SORT_OLDEST = 34;
 
     private final CustomItemRegistry registry;
 
@@ -62,14 +50,6 @@ public final class RegistryMenu {
         player.openInventory(createBrowserInventory(page, sortMode, searchQuery));
     }
 
-    public void openControls(Player player, int page, RegistrySortMode sortMode) {
-        openControls(player, page, sortMode, null);
-    }
-
-    public void openControls(Player player, int page, RegistrySortMode sortMode, String searchQuery) {
-        player.openInventory(createControlsInventory(page, sortMode, searchQuery));
-    }
-
     public Inventory createBrowserInventory(int page, RegistrySortMode sortMode) {
         return createBrowserInventory(page, sortMode, null);
     }
@@ -79,25 +59,10 @@ public final class RegistryMenu {
         int totalPages = calculateTotalPages(definitions.size());
         int safePage = clampPage(page, totalPages);
 
-        Inventory inventory = Bukkit.createInventory(new RegistryMenuHolder(RegistryMenuView.BROWSER, safePage, sortMode, searchQuery), INVENTORY_SIZE, buildTitle(safePage, totalPages, searchQuery));
+        Inventory inventory = Bukkit.createInventory(new RegistryMenuHolder(safePage, sortMode, searchQuery), INVENTORY_SIZE, buildTitle(safePage, totalPages, searchQuery));
         fillBackground(inventory);
         placeItems(inventory, definitions, safePage);
-        placeControls(inventory, safePage, totalPages);
-        return inventory;
-    }
-
-    public Inventory createControlsInventory(int page, RegistrySortMode sortMode) {
-        return createControlsInventory(page, sortMode, null);
-    }
-
-    public Inventory createControlsInventory(int page, RegistrySortMode sortMode, String searchQuery) {
-        List<CustomItemDefinition> definitions = getVisibleDefinitions(sortMode, searchQuery);
-        int totalPages = calculateTotalPages(definitions.size());
-        int safePage = clampPage(page, totalPages);
-
-        Inventory inventory = Bukkit.createInventory(new RegistryMenuHolder(RegistryMenuView.CONTROLS, safePage, sortMode, searchQuery), INVENTORY_SIZE, ChatColor.DARK_PURPLE + "Search & Sort");
-        fillBackground(inventory);
-        placeControlsMenu(inventory, safePage, totalPages, sortMode, searchQuery);
+        placeControls(inventory, safePage, totalPages, sortMode, searchQuery);
         return inventory;
     }
 
@@ -156,42 +121,18 @@ public final class RegistryMenu {
         return definitions.get(index);
     }
 
-    private void placeControls(Inventory inventory, int page, int totalPages) {
-        inventory.setItem(SLOT_PREV_PAGE, createArrow(Material.ARROW, ChatColor.YELLOW + "Previous Page", page > 1 ? ChatColor.GRAY + "Go to page " + (page - 1) : ChatColor.DARK_GRAY + "No previous page"));
-        inventory.setItem(SLOT_CONTROLS_MENU, createButton(Material.COMPASS, ChatColor.AQUA + "Search Menu", ChatColor.GRAY + "Open the search and filter controls"));
-        inventory.setItem(SLOT_SORT_CYCLE, createButton(Material.HOPPER, ChatColor.YELLOW + "Sort By", ChatColor.GRAY + "Cycle the current sort mode"));
-        inventory.setItem(SLOT_SPACER, createPane());
-        inventory.setItem(SLOT_PAGE_INFO, createInfoItem(ChatColor.GOLD + "Page " + page + ChatColor.GRAY + " / " + totalPages));
-        inventory.setItem(SLOT_RESET, createButton(Material.BOOK, ChatColor.RED + "Reset", ChatColor.GRAY + "Clear filters and sorting"));
-        inventory.setItem(SLOT_FILLER, createPane());
-        inventory.setItem(SLOT_CLOSE, createButton(Material.BARRIER, ChatColor.RED + "Close", ChatColor.GRAY + "Close the registry menu"));
-        inventory.setItem(SLOT_NEXT_PAGE, createArrow(Material.ARROW, ChatColor.YELLOW + "Next Page", page < totalPages ? ChatColor.GRAY + "Go to page " + (page + 1) : ChatColor.DARK_GRAY + "No next page"));
-    }
-
-    private void placeControlsMenu(Inventory inventory, int page, int totalPages, RegistrySortMode sortMode, String searchQuery) {
+    private void placeControls(Inventory inventory, int page, int totalPages, RegistrySortMode sortMode, String searchQuery) {
         boolean hasSearchQuery = searchQuery != null && !searchQuery.isBlank();
         String queryValue = hasSearchQuery ? ChatColor.AQUA + searchQuery : ChatColor.DARK_GRAY + "None";
-        String queryHint = hasSearchQuery ? "Click reset to clear search" : "Use /registry search <terms>";
+        String queryHint = hasSearchQuery ? "Click to search again" : "Click to search";
 
-        ItemStack filler = createPane();
-
-        inventory.setItem(SLOT_CONTROLS_HEADER, createButton(Material.COMPASS, ChatColor.AQUA + "Search & Sort", ChatColor.GRAY + "Browse and refine registry items"));
-        inventory.setItem(SLOT_CONTROLS_QUERY, createButton(Material.PAPER, ChatColor.YELLOW + "Search Query", ChatColor.GRAY + "Current: " + queryValue, ChatColor.GRAY + queryHint));
-        inventory.setItem(SLOT_CONTROLS_SORT, createButton(Material.HOPPER, ChatColor.YELLOW + "Sort By", ChatColor.GRAY + "Current: " + ChatColor.AQUA + sortMode.getDisplayName(), ChatColor.GRAY + "Click to cycle sort mode"));
-        inventory.setItem(SLOT_CONTROLS_PAGE, createButton(Material.PAPER, ChatColor.GOLD + "Current Page", ChatColor.GRAY + String.valueOf(page) + " / " + totalPages));
-        inventory.setItem(19, filler);
-        inventory.setItem(20, filler);
-        inventory.setItem(21, filler);
-        inventory.setItem(22, filler);
-        inventory.setItem(23, filler);
-        inventory.setItem(SLOT_SORT_NAME_ASC, createButton(Material.NAME_TAG, ChatColor.YELLOW + "Name A-Z", ChatColor.GRAY + "Sort by name ascending"));
-        inventory.setItem(SLOT_SORT_NAME_DESC, createButton(Material.NAME_TAG, ChatColor.YELLOW + "Name Z-A", ChatColor.GRAY + "Sort by name descending"));
-        inventory.setItem(SLOT_SORT_TYPE_ASC, createButton(Material.PAPER, ChatColor.AQUA + "Type A-Z", ChatColor.GRAY + "Sort by item type ascending"));
-        inventory.setItem(SLOT_SORT_TYPE_DESC, createButton(Material.PAPER, ChatColor.AQUA + "Type Z-A", ChatColor.GRAY + "Sort by item type descending"));
-        inventory.setItem(SLOT_SORT_NEWEST, createButton(Material.CLOCK, ChatColor.LIGHT_PURPLE + "Newest", ChatColor.GRAY + "Sort by newest registered"));
-        inventory.setItem(SLOT_SORT_OLDEST, createButton(Material.CLOCK, ChatColor.LIGHT_PURPLE + "Oldest", ChatColor.GRAY + "Sort by oldest registered"));
-        inventory.setItem(SLOT_PREV_PAGE, createArrow(Material.ARROW, ChatColor.YELLOW + "Back", ChatColor.GRAY + "Return to the item browser"));
-        inventory.setItem(SLOT_PAGE_INFO, createInfoItem(ChatColor.GOLD + "Controls"));
+        inventory.setItem(SLOT_PREV_PAGE, createArrow(Material.ARROW, ChatColor.YELLOW + "Previous Page", page > 1 ? ChatColor.GRAY + "Go to page " + (page - 1) : ChatColor.DARK_GRAY + "No previous page"));
+        inventory.setItem(SLOT_SEARCH, createButton(Material.COMPASS, ChatColor.AQUA + "Search", ChatColor.GRAY + "Open search prompt"));
+        inventory.setItem(SLOT_SORT, createButton(Material.HOPPER, ChatColor.YELLOW + "Sort By", ChatColor.GRAY + "Current: " + ChatColor.AQUA + sortMode.getDisplayName(), ChatColor.GRAY + "Click to cycle sort mode"));
+        inventory.setItem(SLOT_QUERY, createButton(Material.PAPER, ChatColor.YELLOW + "Search Query", ChatColor.GRAY + "Current: " + queryValue, ChatColor.GRAY + queryHint));
+        inventory.setItem(SLOT_PAGE_INFO, createInfoItem(ChatColor.GOLD + "Page " + page + ChatColor.GRAY + " / " + totalPages));
+        inventory.setItem(SLOT_RESET, createButton(Material.BOOK, ChatColor.RED + "Reset", ChatColor.GRAY + "Clear search and sorting"));
+        inventory.setItem(SLOT_FILLER, createPane());
         inventory.setItem(SLOT_CLOSE, createButton(Material.BARRIER, ChatColor.RED + "Close", ChatColor.GRAY + "Close the registry menu"));
         inventory.setItem(SLOT_NEXT_PAGE, createArrow(Material.ARROW, ChatColor.YELLOW + "Next Page", page < totalPages ? ChatColor.GRAY + "Go to page " + (page + 1) : ChatColor.DARK_GRAY + "No next page"));
     }
