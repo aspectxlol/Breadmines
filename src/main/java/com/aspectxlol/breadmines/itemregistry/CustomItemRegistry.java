@@ -128,7 +128,7 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
         String displayName = resolveDisplayName(snapshot, normalizedName);
         CustomItemDefinition definition = new CustomItemDefinition(normalizedName, displayName, snapshot, System.currentTimeMillis(), source);
         definitions.put(normalizedName, definition);
-        save();
+        save("Add registry key: " + normalizedName);
         return definition;
     }
 
@@ -158,7 +158,7 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
         ItemStack snapshot = itemStack.clone();
         CustomItemDefinition definition = new CustomItemDefinition(normalizedName, resolveDisplayName(snapshot, normalizedName), snapshot, System.currentTimeMillis(), source);
         definitions.put(normalizedName, definition);
-        save();
+        save("Add registry key: " + normalizedName);
         return definition;
     }
 
@@ -201,7 +201,7 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
         String resolvedSource = source == null || source.isBlank() ? existing.getSource() : source;
         CustomItemDefinition updated = new CustomItemDefinition(existing.getId(), displayName, snapshot, existing.getCreatedAtMillis(), resolvedSource);
         definitions.put(normalizedName, updated);
-        save();
+        save("Update registry key: " + normalizedName);
         return Optional.of(updated);
     }
 
@@ -228,7 +228,7 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
         CustomItemDefinition renamed = new CustomItemDefinition(normalizedNewName, existing.getDisplayName(), existing.getItemStack(), existing.getCreatedAtMillis(), existing.getSource());
         definitions.remove(normalizedOldName);
         definitions.put(normalizedNewName, renamed);
-        save();
+        save("Rename registry key: " + normalizedOldName + " -> " + normalizedNewName);
         return Optional.of(renamed);
     }
 
@@ -240,7 +240,7 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
             return false;
         }
 
-        save();
+        save("Remove registry key: " + normalizedName);
         return true;
     }
 
@@ -321,7 +321,7 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
         if (!loaded && legacyStorageFile.exists()) {
             loaded = loadFromLegacyYaml(legacyStorageFile);
             if (loaded) {
-                save();
+                save("Migrate legacy registry");
                 source = RegistrySyncSource.LEGACY;
             }
         }
@@ -330,6 +330,10 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
     }
 
     public synchronized void save() {
+        save("Update custom item registry");
+    }
+
+    public synchronized void save(String commitMessage) {
         if (!ensureDataFolder()) {
             return;
         }
@@ -339,7 +343,8 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
 
         if (githubEnabled && githubSyncOnSave) {
             String payload = json;
-            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> pushGithubFile(payload));
+            String msg = commitMessage == null || commitMessage.isBlank() ? "Update custom item registry" : commitMessage;
+            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> pushGithubFile(payload, null, msg));
         }
     }
 
@@ -500,7 +505,61 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
             }
         }
 
-        String body = buildGithubPutPayload(json, remoteFile == null ? null : remoteFile.sha);
+        String body = buildGithubPutPayload(json, remoteFile == null ? null : remoteFile.sha, "Update custom item registry");
+        GitHubResponse response = sendGithubRequest("PUT", buildGithubContentUrl(), githubToken, body);
+        if (response == null) {
+            return false;
+        }
+
+        if (response.status >= 200 && response.status < 300) {
+            try {
+                JsonObject jsonResponse = gson.fromJson(response.body, JsonObject.class);
+                if (jsonResponse != null && jsonResponse.has("content")) {
+                    JsonObject content = jsonResponse.getAsJsonObject("content");
+                    if (content != null && content.has("sha")) {
+                        lastSyncedSha = content.get("sha").getAsString();
+                    }
+                }
+            } catch (Exception exception) {
+                plugin.getLogger().warning("Registry sync succeeded but could not parse response: " + exception.getMessage());
+            }
+            return true;
+        }
+
+        plugin.getLogger().warning("Registry sync failed (" + response.status + "): " + response.body);
+        return false;
+    }
+
+    private boolean pushGithubFile(String json, String sha, String message) {
+        if (!isGithubConfigured()) {
+            plugin.getLogger().warning("GitHub registry sync is enabled but repo settings are missing.");
+            return false;
+        }
+
+        if (githubToken.isBlank()) {
+            plugin.getLogger().warning("GitHub registry sync token missing; skipping push.");
+            return false;
+        }
+
+        GitHubFile remoteFile = fetchGithubFile();
+        if (remoteFile != null) {
+            if (lastSyncedSha == null || !lastSyncedSha.equals(remoteFile.sha)) {
+                if (!isSameJson(remoteFile.content, json)) {
+                    plugin.getLogger().warning("Registry sync conflict detected. Remote file changed; skipping push.");
+                    return false;
+                }
+
+                lastSyncedSha = remoteFile.sha;
+                return true;
+            }
+
+            if (isSameJson(remoteFile.content, json)) {
+                lastSyncedSha = remoteFile.sha;
+                return true;
+            }
+        }
+
+        String body = buildGithubPutPayload(json, remoteFile == null ? null : remoteFile.sha, message == null ? "Update custom item registry" : message);
         GitHubResponse response = sendGithubRequest("PUT", buildGithubContentUrl(), githubToken, body);
         if (response == null) {
             return false;
@@ -606,9 +665,9 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
         }
     }
 
-    private String buildGithubPutPayload(String json, String sha) {
+    private String buildGithubPutPayload(String json, String sha, String message) {
         JsonObject payload = new JsonObject();
-        payload.addProperty("message", "Update custom item registry");
+        payload.addProperty("message", message == null || message.isBlank() ? "Update custom item registry" : message);
         payload.addProperty("content", Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8)));
         payload.addProperty("branch", githubBranch);
         if (sha != null && !sha.isBlank()) {

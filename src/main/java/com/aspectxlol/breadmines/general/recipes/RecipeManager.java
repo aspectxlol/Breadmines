@@ -117,8 +117,9 @@ public final class RecipeManager {
         repository.upsert(recipe);
         recipes.put(normalizedOutputKey, recipe);
         if (githubEnabled && githubSyncOnSave) {
-            // push asynchronously
-            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> pushGithubFile(exportToJson(), null));
+            // push asynchronously with descriptive commit message
+            String msg = "Create/Update recipe: " + normalizedOutputKey;
+            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> pushGithubFile(exportToJson(), null, msg));
         }
         return recipe;
     }
@@ -128,6 +129,10 @@ public final class RecipeManager {
         boolean removed = repository.delete(normalizedOutputKey);
         if (removed) {
             recipes.remove(normalizedOutputKey);
+            if (githubEnabled && githubSyncOnSave) {
+                String msg = "Delete recipe: " + normalizedOutputKey;
+                plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> pushGithubFile(exportToJson(), null, msg));
+            }
         }
         return removed;
     }
@@ -172,7 +177,7 @@ public final class RecipeManager {
         String localJson = exportToJson();
 
         if (remote == null) {
-            return pushGithubFile(localJson, null);
+            return pushGithubFile(localJson, null, "Sync recipes (initial push)");
         }
 
         if (lastSyncedSha != null && !lastSyncedSha.equals(remote.sha)) {
@@ -190,7 +195,7 @@ public final class RecipeManager {
                 lastSyncedSha = remote.sha;
                 return true;
             }
-            return pushGithubFile(localJson, remote.sha);
+            return pushGithubFile(localJson, remote.sha, "Sync recipes (push local after import failure)");
         }
 
         lastSyncedSha = remote.sha;
@@ -241,9 +246,13 @@ public final class RecipeManager {
     }
 
     private boolean pushGithubFile(String json, String sha) {
+        return pushGithubFile(json, sha, "Update recipes registry");
+    }
+
+    private boolean pushGithubFile(String json, String sha, String message) {
         if (!isGithubConfigured()) return false;
         if (githubToken == null || githubToken.isBlank()) return false;
-        String body = buildGithubPutPayload(json, sha);
+        String body = buildGithubPutPayload(json, sha, message);
         GitHubResponse response = sendGithubRequest("PUT", buildGithubContentUrl(), githubToken, body);
         if (response == null) return false;
         if (response.status >= 200 && response.status < 300) {
@@ -315,9 +324,9 @@ public final class RecipeManager {
         } finally { if (connection != null) connection.disconnect(); }
     }
 
-    private String buildGithubPutPayload(String json, String sha) {
+    private String buildGithubPutPayload(String json, String sha, String message) {
         JsonObject payload = new JsonObject();
-        payload.addProperty("message", "Update recipes registry");
+        payload.addProperty("message", message == null || message.isBlank() ? "Update recipes registry" : message);
         payload.addProperty("content", Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8)));
         payload.addProperty("branch", githubBranch);
         if (sha != null && !sha.isBlank()) payload.addProperty("sha", sha);

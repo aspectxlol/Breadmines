@@ -98,6 +98,10 @@ public class DropSystemHandler {
      */
     public void insertOrUpdateBlockDrop(String blockName, String itemId) throws SQLException {
         repository.upsert(blockName, itemId);
+        if (githubEnabled && githubSyncOnSave) {
+            String msg = "Upsert drop: " + blockName;
+            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> pushGithubFile(exportToJson(), null, msg));
+        }
     }
 
     /**
@@ -105,6 +109,10 @@ public class DropSystemHandler {
      */
     public void deleteBlockDrop(String blockName) throws SQLException {
         repository.delete(blockName);
+        if (githubEnabled && githubSyncOnSave) {
+            String msg = "Delete drop: " + blockName;
+            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> pushGithubFile(exportToJson(), null, msg));
+        }
     }
 
     /**
@@ -276,6 +284,10 @@ public class DropSystemHandler {
     }
 
     private boolean pushGithubFile(String json, String sha) {
+        return pushGithubFile(json, sha, "Update drops registry");
+    }
+
+    private boolean pushGithubFile(String json, String sha, String message) {
         if (!isGithubConfigured()) {
             plugin.getLogger().warning("Drops GitHub sync not configured; skipping push.");
             return false;
@@ -286,7 +298,7 @@ public class DropSystemHandler {
             return false;
         }
 
-        String body = buildGithubPutPayload(json, sha);
+        String body = buildGithubPutPayload(json, sha, message);
         GitHubResponse response = sendGithubRequest("PUT", buildGithubContentUrl(), githubToken, body);
         if (response == null) return false;
         if (response.status >= 200 && response.status < 300) {
@@ -368,9 +380,9 @@ public class DropSystemHandler {
         }
     }
 
-    private String buildGithubPutPayload(String json, String sha) {
+    private String buildGithubPutPayload(String json, String sha, String message) {
         JsonObject payload = new JsonObject();
-        payload.addProperty("message", "Update drops registry");
+        payload.addProperty("message", message == null || message.isBlank() ? "Update drops registry" : message);
         payload.addProperty("content", Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8)));
         payload.addProperty("branch", githubBranch);
         if (sha != null && !sha.isBlank()) payload.addProperty("sha", sha);
