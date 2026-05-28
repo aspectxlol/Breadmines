@@ -70,6 +70,20 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
 
     private volatile String lastSyncedSha;
 
+    private enum RegistrySyncSource { NONE, GITHUB, LOCAL, LEGACY }
+
+    public static final class RegistrySyncResult {
+        public final boolean loaded;
+        public final String sourceName;
+        public final int count;
+
+        private RegistrySyncResult(boolean loaded, String sourceName, int count) {
+            this.loaded = loaded;
+            this.sourceName = sourceName;
+            this.count = count;
+        }
+    }
+
     public CustomItemRegistry(Breadmines plugin) {
         this.plugin = plugin;
         String storageFileName = plugin.getConfig().getString("registry.storage.file", DEFAULT_STORAGE_FILE);
@@ -79,14 +93,15 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
         this.registryKey = new NamespacedKey(plugin, "custom_item_id");
         this.gson = new GsonBuilder().setPrettyPrinting().create();
 
-        this.githubEnabled = plugin.getConfig().getBoolean("registry.github.enabled", false);
-        this.githubSyncOnStartup = plugin.getConfig().getBoolean("registry.github.syncOnStartup", false);
-        this.githubSyncOnSave = plugin.getConfig().getBoolean("registry.github.syncOnSave", false);
-        this.githubOwner = sanitizeSegment(plugin.getConfig().getString("registry.github.owner", ""));
-        this.githubRepo = sanitizeSegment(plugin.getConfig().getString("registry.github.repo", ""));
-        this.githubBranch = sanitizeSegment(plugin.getConfig().getString("registry.github.branch", DEFAULT_GITHUB_BRANCH));
-        this.githubPath = sanitizePath(plugin.getConfig().getString("registry.github.path", DEFAULT_GITHUB_PATH));
-        this.githubToken = loadGithubToken();
+        com.aspectxlol.breadmines.config.GitHubConfig gh = new com.aspectxlol.breadmines.config.GitHubConfig(plugin, "registry", DEFAULT_GITHUB_PATH);
+        this.githubEnabled = gh.isEnabled();
+        this.githubSyncOnStartup = gh.isSyncOnStartup();
+        this.githubSyncOnSave = gh.isSyncOnSave();
+        this.githubOwner = gh.getOwner();
+        this.githubRepo = gh.getRepo();
+        this.githubBranch = gh.getBranch();
+        this.githubPath = gh.getPath();
+        this.githubToken = gh.getToken();
     }
 
     @Override
@@ -270,31 +285,48 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
         return getItemId(itemStack).isPresent();
     }
 
-    public void load() {
+    public synchronized void load() {
+        syncInternal(githubEnabled && githubSyncOnStartup);
+    }
+
+    public synchronized RegistrySyncResult syncNow() {
+        return syncInternal(true);
+    }
+
+    private RegistrySyncResult syncInternal(boolean allowGithub) {
         definitions.clear();
 
         boolean loaded = false;
-        if (githubEnabled && githubSyncOnStartup) {
+        RegistrySyncSource source = RegistrySyncSource.NONE;
+
+        if (allowGithub && githubEnabled) {
             GitHubFile remoteFile = fetchGithubFile();
             if (remoteFile != null && remoteFile.content != null && !remoteFile.content.isBlank()) {
                 loaded = loadFromJson(remoteFile.content);
                 if (loaded) {
                     lastSyncedSha = remoteFile.sha;
                     writeLocalJson(remoteFile.content);
+                    source = RegistrySyncSource.GITHUB;
                 }
             }
         }
 
         if (!loaded && storageFile.exists()) {
             loaded = loadFromJsonFile(storageFile);
+            if (loaded) {
+                source = RegistrySyncSource.LOCAL;
+            }
         }
 
         if (!loaded && legacyStorageFile.exists()) {
             loaded = loadFromLegacyYaml(legacyStorageFile);
             if (loaded) {
                 save();
+                source = RegistrySyncSource.LEGACY;
             }
         }
+
+        return new RegistrySyncResult(loaded, source.name(), definitions.size());
     }
 
     public synchronized void save() {

@@ -22,7 +22,7 @@ import java.util.Locale;
 
 public class RegistryCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> ROOT_SUBCOMMANDS = Arrays.asList("add", "register", "store", "lazyadd", "lazy", "get", "give", "remove", "delete", "rm", "del", "list", "ls", "show", "search", "find", "query");
+    private static final List<String> ROOT_SUBCOMMANDS = Arrays.asList("add", "register", "store", "lazyadd", "lazy", "get", "give", "remove", "delete", "rm", "del", "list", "ls", "show", "search", "find", "query", "sync");
 
     private final CustomItemRegistry registry;
     private final RegistryMenu menu;
@@ -68,6 +68,8 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
             case "find":
             case "query":
                 return handleSearch(sender, label, args);
+            case "sync":
+                return handleSync(sender);
             default:
                 sender.sendMessage(ChatColor.RED + "Unknown subcommand: " + args[0]);
                 sendUsage(sender, label);
@@ -109,8 +111,12 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
         }
 
         String name = joinArgs(args, 1);
-        CustomItemDefinition definition = registry.registerItem(name, heldItem, player.getName());
-        sender.sendMessage(ChatColor.GREEN + "✓ Registered item " + ChatColor.AQUA + definition.getId() + ChatColor.GREEN + " from " + definition.getDisplayName());
+        try {
+            CustomItemDefinition definition = registry.registerItem(name, heldItem, player.getName());
+            sender.sendMessage(ChatColor.GREEN + "✓ Registered item " + ChatColor.AQUA + definition.getId() + ChatColor.GREEN + " from " + definition.getDisplayName());
+        } catch (IllegalArgumentException exception) {
+            sender.sendMessage(ChatColor.RED + exception.getMessage());
+        }
         return true;
     }
 
@@ -201,8 +207,29 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean handleSync(CommandSender sender) {
+        if (!sender.hasPermission("breadmines.registry")) {
+            sender.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
+            return true;
+        }
+
+        sender.sendMessage(ChatColor.GRAY + "Synchronizing registry... This may take a moment.");
+        try {
+            CustomItemRegistry.RegistrySyncResult result = registry.syncNow();
+            if (result.loaded) {
+                sender.sendMessage(ChatColor.GREEN + "✓ Registry synchronized (source: " + result.sourceName + ") with " + result.count + " entries.");
+            } else {
+                sender.sendMessage(ChatColor.RED + "✗ Registry synchronization failed or no data found.");
+            }
+        } catch (Exception e) {
+            sender.sendMessage(ChatColor.RED + "✗ Registry sync error: " + e.getMessage());
+        }
+        return true;
+    }
+
     private void sendUsage(CommandSender sender, String label) {
         sender.sendMessage(ChatColor.YELLOW + "Usage: /" + label + " <add|lazyadd|get|remove|delete|list|search> ...");
+        sender.sendMessage(ChatColor.YELLOW + "Additional: /" + label + " sync - synchronize registry with configured sources");
         sender.sendMessage(ChatColor.GRAY + "Add uses an explicit name. Lazyadd uses the held item's display name. Search ranks exact and partial matches across item id, name, type, and lore.");
         sender.sendMessage(ChatColor.GRAY + "Aliases: /" + label + " register, store, lazy, give, delete, rm, del, ls, show, find, query");
     }

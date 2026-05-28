@@ -94,6 +94,20 @@ public class DropCommandHandler implements CommandExecutor {
 
             } else if (action.equals("debug")) {
                 return handleDebugCommand(sender, args);
+            } else if (action.equals("sync")) {
+                sender.sendMessage("§ePerforming drops sync with configured sources...");
+                try {
+                    boolean ok = dropHandler.syncWithGithub();
+                    if (ok) {
+                        List<String[]> entries = dropHandler.getAllBlockDrops();
+                        sender.sendMessage("§a✓ Drops sync completed. Total entries: " + entries.size());
+                    } else {
+                        sender.sendMessage("§c✗ Drops sync failed or not configured.");
+                    }
+                } catch (SQLException e) {
+                    sender.sendMessage("§c✗ Database error: " + e.getMessage());
+                }
+                return true;
             } else {
                 sender.sendMessage("§c✗ Unknown action: " + action);
             }

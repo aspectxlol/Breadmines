@@ -1,12 +1,32 @@
+github:
+  # Shared GitHub defaults. Per-section settings may override these.
+  owner: "aspectxlol"
+  repo: "breadmines-repo"
+  branch: "main"
+  token: "" # Leave empty; put the real token in plugins/Breadmines/secrets.yml under the appropriate key (e.g. registry.github.token)
+
 registry:
   storage:
     file: "custom_item_registry.json"
   github:
     enabled: true
-    owner: "aspectxlol"
-    repo: "breadmines-repo"
-    branch: "main"
+    # When left blank, owner/repo/branch/token inherit from top-level `github` above
     path: "data/item_registry.json"
-    token: "" # Leave empty; set registry.github.token in plugins/Breadmines/secrets.yml
     syncOnStartup: true
     syncOnSave: true
+
+drops:
+  github:
+    enabled: true
+    # Optional overrides; leave blank to inherit top-level `github` values
+    path: "data/drops_registry.json"
+    syncOnStartup: false
+    syncOnSave: false
+
+recipes:
+  github:
+    enabled: true
+    # Optional overrides; leave blank to inherit top-level `github` values
+    path: "data/recipes.json"
+    syncOnStartup: false
+    syncOnSave: false

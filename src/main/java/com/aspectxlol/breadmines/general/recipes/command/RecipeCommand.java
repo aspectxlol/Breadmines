@@ -23,7 +23,7 @@ import java.util.Locale;
 
 public final class RecipeCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> SUBCOMMANDS = Arrays.asList("create", "update", "delete", "remove", "list", "ls", "info");
+    private static final List<String> SUBCOMMANDS = Arrays.asList("create", "update", "delete", "remove", "list", "ls", "info", "sync");
 
     private final Breadmines plugin;
     private final RecipeManager recipeManager;
@@ -54,6 +54,8 @@ public final class RecipeCommand implements CommandExecutor, TabCompleter {
                 case "create":
                 case "update":
                     return handleCreateOrUpdate(sender, label, args);
+                case "sync":
+                    return handleSync(sender);
                 case "delete":
                 case "remove":
                     return handleDelete(sender, label, args);
@@ -157,6 +159,27 @@ public final class RecipeCommand implements CommandExecutor, TabCompleter {
 
         recipeListMenu.open(player, 1);
         player.sendMessage(ChatColor.GREEN + "Opened recipe list.");
+        return true;
+    }
+
+    private boolean handleSync(CommandSender sender) {
+        if (!CommandUtils.requirePermission(sender, "breadmines.recipe")) {
+            return true;
+        }
+
+        try {
+            boolean ok = recipeManager.syncWithGithub();
+            if (ok) {
+                sender.sendMessage(ChatColor.GREEN + "✓ Recipes synchronized with GitHub. Total: " + recipeManager.getRecipes().size());
+            } else {
+                // fallback: reload local DB
+                recipeManager.load();
+                sender.sendMessage(ChatColor.YELLOW + "⚠ Recipes sync not configured or skipped; reloaded local DB. Total: " + recipeManager.getRecipes().size());
+            }
+        } catch (SQLException e) {
+            sender.sendMessage(ChatColor.RED + "Recipe database error: " + e.getMessage());
+            plugin.getLogger().severe("Recipe sync SQL error: " + e.getMessage());
+        }
         return true;
     }
 
