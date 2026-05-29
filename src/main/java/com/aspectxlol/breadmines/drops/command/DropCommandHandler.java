@@ -1,10 +1,12 @@
 package com.aspectxlol.breadmines.drops.command;
 
 import com.aspectxlol.breadmines.drops.DropSystemHandler;
+import com.aspectxlol.breadmines.util.CommandUtils;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.sql.SQLException;
@@ -126,15 +128,44 @@ public class DropCommandHandler implements CommandExecutor {
     private boolean handleDebugCommand(CommandSender sender, String[] args) {
         try {
             if (args.length == 1) {
-                dropHandler.setDebugMode(!dropHandler.isDebugMode());
-                sender.sendMessage("§a✓ Debug mode " + (dropHandler.isDebugMode() ? "enabled" : "disabled"));
+                Player player = CommandUtils.requirePlayer(sender);
+                if (player != null) {
+                    boolean enabled = dropHandler.toggleMiningDebug(player);
+                    player.sendMessage("§a✓ Drops mining debug " + (enabled ? "enabled" : "disabled"));
+                    player.sendMessage("§7Mine a registered block to see its drop lookup in chat.");
+                } else {
+                    dropHandler.setDebugMode(!dropHandler.isDebugMode());
+                    sender.sendMessage("§a✓ Global drops debug mode " + (dropHandler.isDebugMode() ? "enabled" : "disabled"));
+                }
                 return true;
             }
 
             String debugAction = args[1].toLowerCase(Locale.ROOT);
+            if (debugAction.equals("toggle") || debugAction.equals("global")) {
+                dropHandler.setDebugMode(!dropHandler.isDebugMode());
+                sender.sendMessage("§a✓ Global drops debug mode " + (dropHandler.isDebugMode() ? "enabled" : "disabled"));
+                return true;
+            }
+
+            if (debugAction.equals("watch") || debugAction.equals("mine")) {
+                Player player = CommandUtils.requirePlayer(sender);
+                if (player == null) {
+                    return true;
+                }
+
+                boolean enabled = dropHandler.toggleMiningDebug(player);
+                player.sendMessage("§a✓ Drops mining debug " + (enabled ? "enabled" : "disabled"));
+                player.sendMessage("§7Mine a registered block to see its drop lookup in chat.");
+                return true;
+            }
+
             if (debugAction.equals("status")) {
                 sender.sendMessage("§6=== Debug Status ===");
-                sender.sendMessage("§aDebug mode: " + (dropHandler.isDebugMode() ? "enabled" : "disabled"));
+                sender.sendMessage("§aGlobal debug mode: " + (dropHandler.isDebugMode() ? "enabled" : "disabled"));
+                Player player = sender instanceof Player ? (Player) sender : null;
+                if (player != null) {
+                    sender.sendMessage("§aMining debug watch: " + (dropHandler.isMiningDebugEnabled(player) ? "enabled" : "disabled"));
+                }
                 sender.sendMessage("§aRegistered blocks: " + dropHandler.getAllBlockDrops().size());
                 List<String> itemIds = dropHandler.getRegisteredItemIds();
                 sender.sendMessage("§aRegistry item IDs loaded: " + itemIds.size());
@@ -176,6 +207,9 @@ public class DropCommandHandler implements CommandExecutor {
             }
 
             sender.sendMessage("§e/drops debug - toggle debug mode");
+            sender.sendMessage("§e/drops debug watch - toggle live mining debug for you");
+            sender.sendMessage("§e/drops debug mine - same as watch");
+            sender.sendMessage("§e/drops debug global - toggle server logging debug mode");
             sender.sendMessage("§e/drops debug status - show debug status");
             sender.sendMessage("§e/drops debug list - list registered blocks");
             sender.sendMessage("§e/drops debug check <block_name> - inspect a registered block entry");

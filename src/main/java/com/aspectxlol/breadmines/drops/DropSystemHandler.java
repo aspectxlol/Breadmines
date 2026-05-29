@@ -15,6 +15,9 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -33,6 +36,7 @@ public class DropSystemHandler {
     private final DropItemResolver itemResolver;
     private final DropMultiplierService multiplierService;
     private boolean debugMode = false;
+    private final Set<UUID> miningDebugWatchers = ConcurrentHashMap.newKeySet();
 
     // GitHub sync config
     private final com.aspectxlol.breadmines.config.GitHubConfig githubConfig;
@@ -282,5 +286,24 @@ public class DropSystemHandler {
      */
     public void setDebugMode(boolean mode) {
         debugMode = mode;
+    }
+
+    public boolean isMiningDebugEnabled(Player player) {
+        return player != null && miningDebugWatchers.contains(player.getUniqueId());
+    }
+
+    public boolean toggleMiningDebug(Player player) {
+        if (player == null) {
+            return false;
+        }
+
+        UUID playerId = player.getUniqueId();
+        if (miningDebugWatchers.contains(playerId)) {
+            miningDebugWatchers.remove(playerId);
+            return false;
+        }
+
+        miningDebugWatchers.add(playerId);
+        return true;
     }
 }

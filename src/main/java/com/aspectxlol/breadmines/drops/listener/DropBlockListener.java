@@ -33,7 +33,9 @@ public class DropBlockListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
+        Player player = event.getPlayer();
         String blockName = dropHandler.normalizeBlockName(block.getType().name().toLowerCase(Locale.ROOT));
+        boolean playerDebugEnabled = dropHandler.isMiningDebugEnabled(player);
 
         try {
             if (dropHandler.isDebugMode()) {
@@ -47,16 +49,31 @@ public class DropBlockListener implements Listener {
             }
 
             if (itemId != null) {
-                Player player = event.getPlayer();
                 ItemStack tool = player.getInventory().getItemInMainHand();
 
                 int nativeFortuneAmount = dropHandler.calculateFortuneAmount(block, tool, player);
+                int customDropAmount = Math.max(1, nativeFortuneAmount);
+                ItemStack previewDrop = dropHandler.resolveDropItem(itemId, customDropAmount).orElse(null);
 
                 if (dropHandler.isDebugMode()) {
                     plugin.getLogger().info("[DEBUG] onBlockBreak registered=" + blockName
                             + " itemId=" + itemId
                             + " tool=" + (tool != null ? tool.getType() : "none")
-                            + " fortune=" + nativeFortuneAmount);
+                            + " fortune=" + nativeFortuneAmount
+                            + " preview=" + (previewDrop != null ? previewDrop.getType() + " x" + previewDrop.getAmount() : "none"));
+                }
+
+                if (playerDebugEnabled) {
+                    player.sendMessage("§6=== Drops Debug ===");
+                    player.sendMessage("§eBlock: §f" + block.getType().name() + " §7(" + blockName + ")");
+                    player.sendMessage("§eRegistry item: §b" + itemId);
+                    player.sendMessage("§eTool: §f" + (tool != null ? tool.getType().name() : "none"));
+                    player.sendMessage("§eFortune amount: §f" + nativeFortuneAmount);
+                    if (previewDrop != null) {
+                        player.sendMessage("§eResolved drop: §f" + previewDrop.getType().name() + " x" + previewDrop.getAmount());
+                    } else {
+                        player.sendMessage("§cResolved drop: none");
+                    }
                 }
 
                 event.setDropItems(false);

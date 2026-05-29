@@ -51,6 +51,8 @@ public class DropTabCompleter implements TabCompleter {
                     } catch (Exception e) {
                         plugin.getLogger().warning("Error fetching block types: " + e.getMessage());
                     }
+                } else if (action.equals("debug")) {
+                    completions.addAll(Arrays.asList("watch", "mine", "global", "toggle", "status", "list", "check"));
                 }
             } else if (args.length == 3) {
                 String action = args[0].toLowerCase();
