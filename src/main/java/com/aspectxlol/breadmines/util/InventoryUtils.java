@@ -1,7 +1,9 @@
 package com.aspectxlol.breadmines.util;
 
 import com.aspectxlol.breadmines.itemregistry.CustomItemRegistry;
+import org.bukkit.ChatColor;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.PlayerInventory;
 
 import java.util.function.Consumer;
@@ -10,6 +12,7 @@ public final class InventoryUtils {
     private InventoryUtils() {}
 
     public static boolean hasAutoCompressor(PlayerInventory inventory, CustomItemRegistry registry) {
+        // Use full contents here so special/extra inventory slots are also detected.
         for (ItemStack stack : inventory.getContents()) {
             if (stack != null && isRegistryKey(stack, registry, "auto_compressor")) return true;
         }
@@ -22,7 +25,7 @@ public final class InventoryUtils {
 
     public static int countItemsByRegistryKey(PlayerInventory inventory, CustomItemRegistry registry, String key) {
         int total = 0;
-        for (ItemStack stack : inventory.getContents()) {
+        for (ItemStack stack : inventory.getStorageContents()) {
             if (stack != null && isRegistryKey(stack, registry, key)) total += stack.getAmount();
         }
         for (ItemStack stack : inventory.getArmorContents()) {
@@ -79,6 +82,49 @@ public final class InventoryUtils {
 
     private static boolean isRegistryKey(ItemStack item, CustomItemRegistry registry, String key) {
         if (item == null) return false;
-        return registry.getItemId(item).map(registry::normalizeName).map(n -> n.equals(key)).orElse(false);
+        String normalizedExpectedKey = registry.normalizeName(key);
+        boolean byResolvedId = registry.getItemId(item)
+            .map(registry::normalizeName)
+            .map(n -> n.equals(normalizedExpectedKey))
+            .orElse(false);
+        if (byResolvedId) {
+            return true;
+        }
+
+        return registry.getDefinition(normalizedExpectedKey)
+            .map(definition -> relaxedDefinitionMatch(item, definition.getItemStack()))
+            .orElse(false);
+    }
+
+    private static boolean relaxedDefinitionMatch(ItemStack candidate, ItemStack definition) {
+        if (candidate == null || definition == null) {
+            return false;
+        }
+
+        if (candidate.getType() != definition.getType()) {
+            return false;
+        }
+
+        ItemMeta candidateMeta = candidate.hasItemMeta() ? candidate.getItemMeta() : null;
+        ItemMeta definitionMeta = definition.hasItemMeta() ? definition.getItemMeta() : null;
+
+        String candidateName = normalizeDisplayName(candidateMeta);
+        String definitionName = normalizeDisplayName(definitionMeta);
+
+        // For plain items with no custom name, match by material only.
+        if (candidateName.isEmpty() || definitionName.isEmpty()) {
+            return true;
+        }
+
+        return candidateName.equals(definitionName);
+    }
+
+    private static String normalizeDisplayName(ItemMeta meta) {
+        if (meta == null || !meta.hasDisplayName()) {
+            return "";
+        }
+
+        String stripped = ChatColor.stripColor(meta.getDisplayName());
+        return stripped == null ? "" : stripped.trim().toLowerCase();
     }
 }

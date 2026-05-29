@@ -8,7 +8,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.aspectxlol.breadmines.storage.SqliteRepositoryBase;
 
@@ -16,6 +18,7 @@ public final class RecipeRepository extends SqliteRepositoryBase {
 
     private static final String DB_NAME = "recipes.db";
     private static final String TABLE_NAME = "autocompressor_recipes";
+    private static final String UNIQUE_INDEX_NAME = "idx_autocompressor_recipes_conflict";
 
     public RecipeRepository(JavaPlugin plugin) {
         super(plugin, DB_NAME);
@@ -23,14 +26,95 @@ public final class RecipeRepository extends SqliteRepositoryBase {
 
     @Override
     protected void onCreateTables(Statement statement) throws SQLException {
-        statement.execute("CREATE TABLE IF NOT EXISTS " + TABLE_NAME + " ("
+        if (!tableExists(statement)) {
+            statement.execute("CREATE TABLE " + TABLE_NAME + " ("
+                + "output_key TEXT NOT NULL, "
+                + "input_key TEXT NOT NULL, "
+                + "input_amount INTEGER NOT NULL, "
+                + "created_at_millis INTEGER NOT NULL, "
+                + "updated_at_millis INTEGER NOT NULL"
+                + ")");
+        } else if (needsSchemaUpgrade(statement)) {
+            migrateLegacyTable(statement);
+        }
+
+        statement.execute("CREATE UNIQUE INDEX IF NOT EXISTS " + UNIQUE_INDEX_NAME + " ON " + TABLE_NAME
+            + " (output_key, input_key, input_amount)");
+    }
+
+    private boolean tableExists(Statement statement) throws SQLException {
+        try (ResultSet resultSet = statement.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='" + TABLE_NAME + "'")) {
+            return resultSet.next();
+        }
+    }
+
+    private boolean needsSchemaUpgrade(Statement statement) throws SQLException {
+        boolean hasOutputPrimaryKey = false;
+        boolean hasInputKey = false;
+        boolean hasInputAmount = false;
+
+        try (ResultSet resultSet = statement.executeQuery("PRAGMA table_info(" + TABLE_NAME + ")")) {
+            while (resultSet.next()) {
+                String columnName = resultSet.getString("name");
+                int primaryKeyPosition = resultSet.getInt("pk");
+                if ("output_key".equalsIgnoreCase(columnName) && primaryKeyPosition > 0) {
+                    hasOutputPrimaryKey = true;
+                }
+                if ("input_key".equalsIgnoreCase(columnName)) {
+                    hasInputKey = true;
+                }
+                if ("input_amount".equalsIgnoreCase(columnName)) {
+                    hasInputAmount = true;
+                }
+            }
+        }
+
+        return hasOutputPrimaryKey || !hasInputKey || !hasInputAmount;
+    }
+
+    private void migrateLegacyTable(Statement statement) throws SQLException {
+        String legacyTable = TABLE_NAME + "_legacy_" + System.currentTimeMillis();
+        statement.execute("ALTER TABLE " + TABLE_NAME + " RENAME TO " + legacyTable);
+
+        statement.execute("CREATE TABLE " + TABLE_NAME + " ("
             + "output_key TEXT NOT NULL, "
             + "input_key TEXT NOT NULL, "
             + "input_amount INTEGER NOT NULL, "
             + "created_at_millis INTEGER NOT NULL, "
-            + "updated_at_millis INTEGER NOT NULL, "
-            + "PRIMARY KEY (output_key, input_key, input_amount)"
+            + "updated_at_millis INTEGER NOT NULL"
             + ")");
+
+        String legacyQuery = "SELECT output_key, input_key, input_amount, created_at_millis, updated_at_millis FROM " + legacyTable;
+        Map<String, RecipeDefinition> deduped = new LinkedHashMap<>();
+
+        try (ResultSet resultSet = statement.executeQuery(legacyQuery)) {
+            while (resultSet.next()) {
+                RecipeDefinition definition = new RecipeDefinition(
+                    resultSet.getString("output_key"),
+                    resultSet.getString("input_key"),
+                    resultSet.getInt("input_amount"),
+                    resultSet.getLong("created_at_millis"),
+                    resultSet.getLong("updated_at_millis")
+                );
+                String key = definition.getOutputKey() + "|" + definition.getInputKey() + "|" + definition.getInputAmount();
+                deduped.putIfAbsent(key, definition);
+            }
+        }
+
+        String insertQuery = "INSERT INTO " + TABLE_NAME + " (output_key, input_key, input_amount, created_at_millis, updated_at_millis) VALUES (?, ?, ?, ?, ?)";
+        try (PreparedStatement preparedStatement = dbConnection.prepareStatement(insertQuery)) {
+            for (RecipeDefinition definition : deduped.values()) {
+                preparedStatement.setString(1, definition.getOutputKey());
+                preparedStatement.setString(2, definition.getInputKey());
+                preparedStatement.setInt(3, definition.getInputAmount());
+                preparedStatement.setLong(4, definition.getCreatedAtMillis());
+                preparedStatement.setLong(5, definition.getUpdatedAtMillis());
+                preparedStatement.addBatch();
+            }
+            preparedStatement.executeBatch();
+        }
+
+        statement.execute("DROP TABLE " + legacyTable);
     }
 
     public void upsert(RecipeDefinition recipe) throws SQLException {

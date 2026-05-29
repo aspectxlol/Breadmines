@@ -13,11 +13,15 @@ import java.util.Map;
 public final class RecipeProcessor {
     private final Breadmines plugin;
     private final CustomItemRegistry itemRegistry;
-    private final boolean debugMode;
+    private boolean debugMode;
 
     public RecipeProcessor(Breadmines plugin, CustomItemRegistry itemRegistry, boolean debugMode) {
         this.plugin = plugin;
         this.itemRegistry = itemRegistry;
+        this.debugMode = debugMode;
+    }
+
+    public void setDebugMode(boolean debugMode) {
         this.debugMode = debugMode;
     }
 
@@ -27,7 +31,7 @@ public final class RecipeProcessor {
 
     public boolean hasAnyCraftableRecipe(PlayerInventory inventory, List<RecipeDefinition> recipes) {
         for (RecipeDefinition recipe : recipes) {
-            if (itemRegistry.createItemStack(recipe.getOutputKey()).isEmpty()) continue;
+            if (itemRegistry.createItemStack(recipe.getOutputKey(), false).isEmpty()) continue;
             if (InventoryUtils.countItemsByRegistryKey(inventory, itemRegistry, recipe.getInputKey()) >= recipe.getInputAmount()) return true;
         }
         return false;
@@ -45,7 +49,7 @@ public final class RecipeProcessor {
 
         for (RecipeDefinition recipe : recipes) {
             // output template
-            var outputOpt = itemRegistry.createItemStack(recipe.getOutputKey());
+            var outputOpt = itemRegistry.createItemStack(recipe.getOutputKey(), false);
             if (outputOpt.isEmpty()) {
                 if (debugMode) plugin.getLogger().info("[RECIPE DEBUG] Skipping recipe " + recipe.getOutputKey() + " because output item is not registered.");
                 continue;

@@ -12,6 +12,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,7 +23,7 @@ import java.util.Locale;
 
 public class RegistryCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> ROOT_SUBCOMMANDS = Arrays.asList("add", "register", "store", "lazyadd", "lazy", "get", "give", "remove", "delete", "rm", "del", "list", "ls", "show", "search", "find", "query", "sync");
+    private static final List<String> ROOT_SUBCOMMANDS = Arrays.asList("add", "register", "store", "lazyadd", "lazy", "get", "give", "remove", "delete", "rm", "del", "list", "ls", "show", "search", "find", "query", "sync", "debug");
 
     private final CustomItemRegistry registry;
     private final RegistryMenu menu;
@@ -70,6 +71,8 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
                 return handleSearch(sender, label, args);
             case "sync":
                 return handleSync(sender);
+            case "debug":
+                return handleDebug(sender, label, args);
             default:
                 sender.sendMessage(ChatColor.RED + "Unknown subcommand: " + args[0]);
                 sendUsage(sender, label);
@@ -87,6 +90,10 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
             String subcommand = args[0].toLowerCase(Locale.ROOT);
             if (subcommand.equals("get") || subcommand.equals("give") || subcommand.equals("remove") || subcommand.equals("delete") || subcommand.equals("rm") || subcommand.equals("del")) {
                 return filterByPrefix(args[1], getRegistryNames());
+            }
+
+            if (subcommand.equals("debug")) {
+                return filterByPrefix(args[1], Arrays.asList("held"));
             }
         }
 
@@ -227,11 +234,72 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean handleDebug(CommandSender sender, String label, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage(ChatColor.YELLOW + "Usage: /" + label + " debug <held>");
+            sender.sendMessage(ChatColor.YELLOW + "/" + label + " debug held - inspect the held item and registry match");
+            return true;
+        }
+
+        String debugAction = args[1].toLowerCase(Locale.ROOT);
+        if (!debugAction.equals("held")) {
+            sender.sendMessage(ChatColor.RED + "Unknown debug action: " + args[1]);
+            sender.sendMessage(ChatColor.YELLOW + "Usage: /" + label + " debug held");
+            return true;
+        }
+
+        Player player = CommandUtils.requirePlayer(sender);
+        if (player == null) {
+            sender.sendMessage(ChatColor.RED + "Use this in-game so I can inspect your held item.");
+            return true;
+        }
+
+        ItemStack heldItem = player.getInventory().getItemInMainHand();
+        sender.sendMessage(ChatColor.GOLD + "=== Held Item Debug: " + player.getName() + " ===");
+        for (String line : buildHeldItemDebugLines(heldItem)) {
+            sender.sendMessage(ChatColor.GRAY + line);
+        }
+        return true;
+    }
+
     private void sendUsage(CommandSender sender, String label) {
         sender.sendMessage(ChatColor.YELLOW + "Usage: /" + label + " <add|lazyadd|get|remove|delete|list|search> ...");
         sender.sendMessage(ChatColor.YELLOW + "Additional: /" + label + " sync - synchronize registry with configured sources");
+        sender.sendMessage(ChatColor.YELLOW + "Additional: /" + label + " debug held - inspect the held item and registry match");
         sender.sendMessage(ChatColor.GRAY + "Add uses an explicit name. Lazyadd uses the held item's display name. Search ranks exact and partial matches across item id, name, type, and lore.");
         sender.sendMessage(ChatColor.GRAY + "Aliases: /" + label + " register, store, lazy, give, delete, rm, del, ls, show, find, query");
+    }
+
+    private List<String> buildHeldItemDebugLines(ItemStack heldItem) {
+        List<String> lines = new ArrayList<>();
+        if (heldItem == null || heldItem.getType().isAir()) {
+            lines.add("Held item: empty");
+            return lines;
+        }
+
+        lines.add("Material: " + heldItem.getType());
+        lines.add("Amount: " + heldItem.getAmount());
+        lines.add("Has item meta: " + (heldItem.hasItemMeta() ? "yes" : "no"));
+        lines.add("Serialized: " + heldItem.serialize());
+
+        ItemMeta meta = heldItem.getItemMeta();
+        if (meta != null) {
+            lines.add("Display name: " + (meta.hasDisplayName() ? meta.getDisplayName() : "none"));
+            lines.add("Lore: " + (meta.hasLore() ? meta.getLore() : "none"));
+            lines.add("Custom model data: " + (meta.hasCustomModelData() ? meta.getCustomModelData() : "none"));
+            lines.add("PDC keys: " + meta.getPersistentDataContainer().getKeys());
+        }
+
+        String resolvedId = registry.getItemId(heldItem).orElse("none");
+        lines.add("Resolved registry id: " + resolvedId);
+
+        registry.getDefinition(heldItem).ifPresentOrElse(definition -> {
+            lines.add("In registry: yes");
+            lines.add("Registry entry display name: " + definition.getDisplayName());
+            lines.add("Registry entry source: " + definition.getSource());
+        }, () -> lines.add("In registry: no"));
+
+        return lines;
     }
 
     private List<String> filterByPrefix(String prefix, Collection<String> values) {

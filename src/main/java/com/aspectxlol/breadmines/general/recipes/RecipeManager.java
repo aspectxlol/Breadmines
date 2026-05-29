@@ -262,6 +262,7 @@ public final class RecipeManager {
 
     public synchronized void setDebugMode(boolean debugMode) {
         this.debugMode = debugMode;
+        if (this.recipeProcessor != null) this.recipeProcessor.setDebugMode(debugMode);
     }
 
     public void processAutoCompressors() {

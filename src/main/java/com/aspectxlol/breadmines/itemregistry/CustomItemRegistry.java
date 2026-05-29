@@ -160,9 +160,15 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
 
     @Override
     public Optional<ItemStack> createItemStack(String name) {
+        return createItemStack(name, true);
+    }
+
+    public Optional<ItemStack> createItemStack(String name, boolean applyRegistryTag) {
         return getDefinition(name).map(definition -> {
             ItemStack itemStack = definition.getItemStack();
-            applyRegistryTag(itemStack, definition.getId());
+            if (applyRegistryTag) {
+                applyRegistryTag(itemStack, definition.getId());
+            }
             return itemStack;
         });
     }
@@ -243,19 +249,19 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
     }
 
     public Optional<String> getItemId(ItemStack itemStack) {
-        if (itemStack == null || !itemStack.hasItemMeta()) {
+        if (itemStack == null || itemStack.getType() == Material.AIR) {
             return Optional.empty();
         }
 
-        ItemMeta meta = itemStack.getItemMeta();
-        if (meta == null) {
-            return Optional.empty();
-        }
-
-        PersistentDataContainer container = meta.getPersistentDataContainer();
-        String id = container.get(registryKey, PersistentDataType.STRING);
-        if (id != null && !id.isBlank()) {
-            return Optional.of(id);
+        if (itemStack.hasItemMeta()) {
+            ItemMeta meta = itemStack.getItemMeta();
+            if (meta != null) {
+                PersistentDataContainer container = meta.getPersistentDataContainer();
+                String id = container.get(registryKey, PersistentDataType.STRING);
+                if (id != null && !id.isBlank()) {
+                    return Optional.of(id);
+                }
+            }
         }
 
         String exactId = findDefinitionIdByExactStack(itemStack);
