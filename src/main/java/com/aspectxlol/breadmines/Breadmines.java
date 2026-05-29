@@ -198,7 +198,7 @@ public final class Breadmines extends JavaPlugin {
 
         RecipeCommand recipeCommand = new RecipeCommand(this);
         getCommand("recipe").setExecutor(recipeCommand);
-        getCommand("recipe").setTabCompleter(recipeCommand);
+        getCommand("recipe").setTabCompleter(new com.aspectxlol.breadmines.general.recipes.command.RecipeTabCompleter(this));
         Bukkit.getPluginManager().registerEvents(new RecipeListMenuListener(this), this);
 
         startAutoCompressorTask();
@@ -233,27 +233,7 @@ public final class Breadmines extends JavaPlugin {
      * Handles mana regeneration for all online players and sends action bar HUD.
      */
     private void startManaRegenerator() {
-        asyncTaskHandle = Bukkit.getScheduler().runTaskTimer(this, () -> {
-            if (!isSystemEnabled || manaManager == null) {
-                return;
-            }
-
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                if (player == null || !player.isOnline()) {
-                    continue;
-                }
-
-                double currentMana = manaManager.getMana(player);
-                double maxMana = manaManager.getMaxMana(player);
-                if (currentMana < maxMana) {
-                    double newMana = Math.min(currentMana + manaRegenPerTick, maxMana);
-                    manaManager.setMana(player, newMana);
-                }
-
-                String actionBar = buildActionBarHUD(player);
-                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(actionBar));
-            }
-        }, 0L, 10L);
+        asyncTaskHandle = com.aspectxlol.breadmines.skyblock.task.ManaRegenerator.start(this, manaManager, manaRegenPerTick);
     }
 
     private void initializeOnlinePlayers() {
@@ -280,13 +260,7 @@ public final class Breadmines extends JavaPlugin {
      */
     @SuppressWarnings("deprecation")
     private String buildActionBarHUD(Player player) {
-        double health = player.getHealth();
-        double maxHealth = player.getMaxHealth();
-        double mana = manaManager.getMana(player);
-        double maxMana = manaManager.getMaxMana(player);
-
-        return ChatColor.RED + "❤ " + String.format("%.0f", health) + "/" + String.format("%.0f", maxHealth) + 
-               ChatColor.GRAY + " ┃ " + ChatColor.BLUE + "✎ " + String.format("%.0f", mana) + "/" + String.format("%.0f", maxMana);
+        return com.aspectxlol.breadmines.ui.ActionBarHudBuilder.build(this, player);
     }
 
     /**

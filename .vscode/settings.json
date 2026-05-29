@@ -22,5 +22,8 @@
         "Regen",
         "Skript",
         "Skyblock"
-    ]
+    ],
+    "chat.tools.terminal.autoApprove": {
+        "./gradlew": true
+    }
 }

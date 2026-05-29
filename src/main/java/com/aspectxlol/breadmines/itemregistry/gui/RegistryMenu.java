@@ -16,6 +16,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import com.aspectxlol.breadmines.ui.MenuItemFactory;
+import com.aspectxlol.breadmines.ui.MenuUtils;
 
 public final class RegistryMenu {
 
@@ -96,7 +98,7 @@ public final class RegistryMenu {
         }
 
         if (definitions.isEmpty()) {
-            inventory.setItem(22, createInfoItem(ChatColor.YELLOW + "No custom items registered"));
+            inventory.setItem(22, MenuItemFactory.createInfoItem(ChatColor.YELLOW + "No custom items registered"));
         }
     }
 
@@ -126,22 +128,19 @@ public final class RegistryMenu {
         String queryValue = hasSearchQuery ? ChatColor.AQUA + searchQuery : ChatColor.DARK_GRAY + "None";
         String queryHint = hasSearchQuery ? "Click to search again" : "Click to search";
 
-        inventory.setItem(SLOT_PREV_PAGE, createArrow(Material.ARROW, ChatColor.YELLOW + "Previous Page", page > 1 ? ChatColor.GRAY + "Go to page " + (page - 1) : ChatColor.DARK_GRAY + "No previous page"));
-        inventory.setItem(SLOT_SEARCH, createButton(Material.COMPASS, ChatColor.AQUA + "Search", ChatColor.GRAY + "Open search prompt"));
-        inventory.setItem(SLOT_SORT, createButton(Material.HOPPER, ChatColor.YELLOW + "Sort By", ChatColor.GRAY + "Current: " + ChatColor.AQUA + sortMode.getDisplayName(), ChatColor.GRAY + "Click to cycle sort mode"));
-        inventory.setItem(SLOT_QUERY, createButton(Material.PAPER, ChatColor.YELLOW + "Search Query", ChatColor.GRAY + "Current: " + queryValue, ChatColor.GRAY + queryHint));
-        inventory.setItem(SLOT_PAGE_INFO, createInfoItem(ChatColor.GOLD + "Page " + page + ChatColor.GRAY + " / " + totalPages));
-        inventory.setItem(SLOT_RESET, createButton(Material.BOOK, ChatColor.RED + "Reset", ChatColor.GRAY + "Clear search and sorting"));
-        inventory.setItem(SLOT_FILLER, createPane());
-        inventory.setItem(SLOT_CLOSE, createButton(Material.BARRIER, ChatColor.RED + "Close", ChatColor.GRAY + "Close the registry menu"));
-        inventory.setItem(SLOT_NEXT_PAGE, createArrow(Material.ARROW, ChatColor.YELLOW + "Next Page", page < totalPages ? ChatColor.GRAY + "Go to page " + (page + 1) : ChatColor.DARK_GRAY + "No next page"));
+        inventory.setItem(SLOT_PREV_PAGE, MenuItemFactory.createArrow(Material.ARROW, ChatColor.YELLOW + "Previous Page", page > 1 ? ChatColor.GRAY + "Go to page " + (page - 1) : ChatColor.DARK_GRAY + "No previous page"));
+        inventory.setItem(SLOT_SEARCH, MenuItemFactory.createButton(Material.COMPASS, ChatColor.AQUA + "Search", ChatColor.GRAY + "Open search prompt"));
+        inventory.setItem(SLOT_SORT, MenuItemFactory.createButton(Material.HOPPER, ChatColor.YELLOW + "Sort By", ChatColor.GRAY + "Current: " + ChatColor.AQUA + sortMode.getDisplayName(), ChatColor.GRAY + "Click to cycle sort mode"));
+        inventory.setItem(SLOT_QUERY, MenuItemFactory.createButton(Material.PAPER, ChatColor.YELLOW + "Search Query", ChatColor.GRAY + "Current: " + queryValue, ChatColor.GRAY + queryHint));
+        inventory.setItem(SLOT_PAGE_INFO, MenuItemFactory.createInfoItem(ChatColor.GOLD + "Page " + page + ChatColor.GRAY + " / " + totalPages));
+        inventory.setItem(SLOT_RESET, MenuItemFactory.createButton(Material.BOOK, ChatColor.RED + "Reset", ChatColor.GRAY + "Clear search and sorting"));
+        inventory.setItem(SLOT_FILLER, MenuItemFactory.createPane());
+        inventory.setItem(SLOT_CLOSE, MenuItemFactory.createButton(Material.BARRIER, ChatColor.RED + "Close", ChatColor.GRAY + "Close the registry menu"));
+        inventory.setItem(SLOT_NEXT_PAGE, MenuItemFactory.createArrow(Material.ARROW, ChatColor.YELLOW + "Next Page", page < totalPages ? ChatColor.GRAY + "Go to page " + (page + 1) : ChatColor.DARK_GRAY + "No next page"));
     }
 
     private void fillBackground(Inventory inventory) {
-        ItemStack filler = createPane();
-        for (int slot = CONTENT_SLOTS; slot < INVENTORY_SIZE; slot++) {
-            inventory.setItem(slot, filler);
-        }
+        MenuUtils.fillBackground(inventory, CONTENT_SLOTS, INVENTORY_SIZE);
     }
 
     private String buildTitle(int page, int totalPages, String searchQuery) {
@@ -154,14 +153,14 @@ public final class RegistryMenu {
 
     private List<CustomItemDefinition> getVisibleDefinitions(RegistrySortMode sortMode, String searchQuery) {
         List<CustomItemDefinition> definitions = new ArrayList<>(registry.getDefinitions());
-        String normalizedQuery = normalizeSearchQuery(searchQuery);
+        String normalizedQuery = RegistrySearch.normalizeSearchQuery(searchQuery);
         Comparator<CustomItemDefinition> comparator = resolveComparator(sortMode);
 
         if (!normalizedQuery.isEmpty()) {
             List<String> tokens = tokenizeSearchQuery(normalizedQuery);
             List<ScoredDefinition> scoredDefinitions = new ArrayList<>();
             for (CustomItemDefinition definition : definitions) {
-                int score = getSearchScore(definition, normalizedQuery, tokens);
+                int score = RegistrySearch.getSearchScore(definition, normalizedQuery, tokens);
                 if (score > 0) {
                     scoredDefinitions.add(new ScoredDefinition(definition, score));
                 }
@@ -265,62 +264,14 @@ public final class RegistryMenu {
         return tokens;
     }
 
-    private ItemStack createArrow(Material material, String name, String loreLine) {
-        ItemStack itemStack = new ItemStack(material);
-        ItemMeta meta = itemStack.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName(name);
-            meta.setLore(List.of(loreLine));
-            itemStack.setItemMeta(meta);
-        }
-        return itemStack;
-    }
-
-    private ItemStack createInfoItem(String name) {
-        ItemStack itemStack = new ItemStack(Material.PAPER);
-        ItemMeta meta = itemStack.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName(name);
-            itemStack.setItemMeta(meta);
-        }
-        return itemStack;
-    }
-
-    private ItemStack createButton(Material material, String name, String loreLine) {
-        return createButton(material, name, List.of(loreLine));
-    }
-
-    private ItemStack createButton(Material material, String name, String loreLineOne, String loreLineTwo) {
-        return createButton(material, name, List.of(loreLineOne, loreLineTwo));
-    }
-
-    private ItemStack createButton(Material material, String name, List<String> lore) {
-        ItemStack itemStack = new ItemStack(material);
-        ItemMeta meta = itemStack.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName(name);
-            meta.setLore(lore);
-            itemStack.setItemMeta(meta);
-        }
-        return itemStack;
-    }
-
-    private ItemStack createPane() {
-        ItemStack itemStack = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
-        ItemMeta meta = itemStack.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName(" ");
-            itemStack.setItemMeta(meta);
-        }
-        return itemStack;
-    }
+    
 
     private int calculateTotalPages(int totalItems) {
-        return Math.max(1, (int) Math.ceil(totalItems / (double) CONTENT_SLOTS));
+        return MenuUtils.calculateTotalPages(totalItems, CONTENT_SLOTS);
     }
 
     private int clampPage(int page, int totalPages) {
-        return Math.max(1, Math.min(page, totalPages));
+        return MenuUtils.clampPage(page, totalPages);
     }
 
     private Comparator<CustomItemDefinition> resolveComparator(RegistrySortMode sortMode) {

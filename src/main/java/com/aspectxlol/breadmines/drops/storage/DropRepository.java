@@ -2,9 +2,6 @@ package com.aspectxlol.breadmines.drops.storage;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.File;
-import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -12,44 +9,23 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
-public class DropRepository {
+import com.aspectxlol.breadmines.storage.SqliteRepositoryBase;
 
-    private final JavaPlugin plugin;
-    private Connection dbConnection;
+public class DropRepository extends SqliteRepositoryBase {
+
     private static final String DB_NAME = "drops_registry.db";
     private static final String TABLE_NAME = "block_drops";
 
     public DropRepository(JavaPlugin plugin) {
-        this.plugin = plugin;
+        super(plugin, DB_NAME);
     }
 
-    public void initialize() throws SQLException {
-        File dataFolder = plugin.getDataFolder();
-        if (!dataFolder.exists()) {
-            dataFolder.mkdirs();
-        }
-
-        File dbFile = new File(dataFolder, DB_NAME);
-        String dbUrl = "jdbc:sqlite:" + dbFile.getAbsolutePath();
-
-        dbConnection = DriverManager.getConnection(dbUrl);
-
-        try (Statement stmt = dbConnection.createStatement()) {
-            stmt.execute("CREATE TABLE IF NOT EXISTS " + TABLE_NAME + " (" +
-                    "block_name TEXT PRIMARY KEY, " +
-                    "item_id TEXT NOT NULL" +
-                    ")");
-        }
-    }
-
-    public void close() {
-        if (dbConnection != null) {
-            try {
-                dbConnection.close();
-            } catch (SQLException e) {
-                plugin.getLogger().severe("Failed to close database: " + e.getMessage());
-            }
-        }
+    @Override
+    protected void onCreateTables(Statement stmt) throws SQLException {
+        stmt.execute("CREATE TABLE IF NOT EXISTS " + TABLE_NAME + " (" +
+                "block_name TEXT PRIMARY KEY, " +
+                "item_id TEXT NOT NULL" +
+                ")");
     }
 
     public String findItemId(String blockName) throws SQLException {

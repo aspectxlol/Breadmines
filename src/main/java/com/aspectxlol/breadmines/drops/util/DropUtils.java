@@ -8,9 +8,6 @@ public final class DropUtils {
     }
 
     public static String normalizeBlockName(String blockName) {
-        if (blockName == null) {
-            return "";
-        }
-        return blockName.toLowerCase(Locale.ROOT).replace(" ", "_").replace("-", "_");
+        return com.aspectxlol.breadmines.util.NormalizationUtils.normalizeName(blockName);
     }
 }

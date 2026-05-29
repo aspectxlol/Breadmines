@@ -42,7 +42,7 @@ public class AbilityListener implements Listener {
     public AbilityListener(Breadmines plugin) {
         this.plugin = plugin;
         this.manaManager = plugin.getManaManager();
-        startEtherwarpPreviewTask();
+        com.aspectxlol.breadmines.skyblock.listener.EtherwarpPreviewTask.start(plugin);
     }
 
     /**
@@ -274,7 +274,7 @@ public class AbilityListener implements Listener {
         if (!AbilityUtils.tryConsumeMana(player, manaManager, 45.0)) return;
 
         Location playerLoc = player.getLocation().clone();
-        Location teleportLoc = calculateTeleportLocation(player, 8.0);
+        Location teleportLoc = com.aspectxlol.breadmines.skyblock.util.TeleportUtils.calculateTeleportLocation(player, 8.0);
         if (teleportLoc == null) return;
 
         player.teleport(teleportLoc);
@@ -353,35 +353,5 @@ public class AbilityListener implements Listener {
         }
     }
 
-    /**
-     * Simple, reliable teleport location calculation.
-     * Steps forward 0.5 blocks at a time until a solid block is hit.
-     * Allows air teleportation.
-     * Returns null if calculation fails (world is null, etc).
-     */
-    private Location calculateTeleportLocation(Player player, double maxDist) {
-        Location loc = player.getLocation().clone();
-        if (loc.getWorld() == null) return null;
-
-        org.bukkit.util.Vector dir = loc.getDirection().normalize();
-        Location lastSafe = loc.clone();
-
-        for (double d = 0.5; d <= maxDist; d += 0.5) {
-            Location check = loc.clone().add(dir.clone().multiply(d));
-            
-            Block feet = check.getBlock();
-            Block head = check.clone().add(0, 1.0, 0).getBlock();
-
-            // Stop if we hit a solid block
-            if (feet.getType().isSolid() || head.getType().isSolid() || feet.getType() == Material.BARRIER || head.getType() == Material.BARRIER) {
-                break;
-            }
-
-            lastSafe = check;
-        }
-
-        lastSafe.setYaw(loc.getYaw());
-        lastSafe.setPitch(loc.getPitch());
-        return lastSafe;
-    }
+    
 }

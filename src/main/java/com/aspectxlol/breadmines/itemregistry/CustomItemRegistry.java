@@ -2,7 +2,7 @@ package com.aspectxlol.breadmines.itemregistry;
 
 import com.aspectxlol.breadmines.Breadmines;
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.aspectxlol.breadmines.util.JsonSerializationHelper;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -19,15 +19,10 @@ import org.bukkit.persistence.PersistentDataType;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.lang.reflect.Type;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,6 +32,8 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
+import com.aspectxlol.breadmines.util.GitHubClient;
+import com.aspectxlol.breadmines.util.GitHubSyncer;
 
 public class CustomItemRegistry implements CustomItemRegistryApi {
 
@@ -46,9 +43,7 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
     private static final String SECRETS_FILE = "secrets.yml";
     private static final String DEFAULT_GITHUB_BRANCH = "main";
     private static final String DEFAULT_GITHUB_PATH = "data/item_registry.json";
-    private static final int GITHUB_TIMEOUT_MS = 10000;
-    private static final String GITHUB_API_BASE = "https://api.github.com";
-    private static final String GITHUB_USER_AGENT = "BreadminesRegistrySync";
+    
     private static final Type MAP_TYPE = new TypeToken<Map<String, Object>>() {}.getType();
 
     private final Breadmines plugin;
@@ -59,16 +54,9 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
     private final Map<String, CustomItemDefinition> definitions = new ConcurrentHashMap<>();
     private final Gson gson;
 
-    private final boolean githubEnabled;
-    private final boolean githubSyncOnStartup;
-    private final boolean githubSyncOnSave;
-    private final String githubOwner;
-    private final String githubRepo;
-    private final String githubBranch;
-    private final String githubPath;
-    private final String githubToken;
-
+    private final com.aspectxlol.breadmines.config.GitHubConfig githubConfig;
     private volatile String lastSyncedSha;
+    private final GitHubClient githubClient;
 
     private enum RegistrySyncSource { NONE, GITHUB, LOCAL, LEGACY }
 
@@ -91,17 +79,11 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
         this.legacyStorageFile = new File(plugin.getDataFolder(), LEGACY_STORAGE_FILE);
         this.secretsFile = new File(plugin.getDataFolder(), SECRETS_FILE);
         this.registryKey = new NamespacedKey(plugin, "custom_item_id");
-        this.gson = new GsonBuilder().setPrettyPrinting().create();
+        this.gson = JsonSerializationHelper.gson();
 
         com.aspectxlol.breadmines.config.GitHubConfig gh = new com.aspectxlol.breadmines.config.GitHubConfig(plugin, "registry", DEFAULT_GITHUB_PATH);
-        this.githubEnabled = gh.isEnabled();
-        this.githubSyncOnStartup = gh.isSyncOnStartup();
-        this.githubSyncOnSave = gh.isSyncOnSave();
-        this.githubOwner = gh.getOwner();
-        this.githubRepo = gh.getRepo();
-        this.githubBranch = gh.getBranch();
-        this.githubPath = gh.getPath();
-        this.githubToken = gh.getToken();
+        this.githubConfig = gh;
+        this.githubClient = new GitHubClient(plugin, gh.getOwner(), gh.getRepo(), gh.getBranch(), gh.getPath(), gh.getToken());
     }
 
     @Override
@@ -257,13 +239,7 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
 
     @Override
     public String normalizeName(String name) {
-        if (name == null) {
-            return "";
-        }
-
-        String normalized = NORMALIZE_PATTERN.matcher(name.trim().toLowerCase(Locale.ROOT)).replaceAll("_");
-        normalized = normalized.replaceAll("^_+|_+$", "");
-        return normalized;
+        return com.aspectxlol.breadmines.util.NormalizationUtils.normalizeName(name);
     }
 
     public Optional<String> getItemId(ItemStack itemStack) {
@@ -331,7 +307,7 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
     }
 
     public synchronized void load() {
-        syncInternal(githubEnabled && githubSyncOnStartup);
+        syncInternal(githubConfig.isEnabled() && githubConfig.isSyncOnStartup());
     }
 
     public synchronized RegistrySyncResult syncNow() {
@@ -343,17 +319,21 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
 
         boolean loaded = false;
         RegistrySyncSource source = RegistrySyncSource.NONE;
+        // Attempt GitHub sync/import first when allowed
+        if (allowGithub && githubConfig.isEnabled()) {
+            GitHubSyncer syncer = new GitHubSyncer(plugin, githubClient);
+            GitHubSyncer.SyncResult res = syncer.sync(() -> RegistryJsonExporter.export(getDefinitions()), (json) -> {
+                boolean ok = loadFromJson(json);
+                if (ok) writeLocalJson(json);
+                return ok;
+            }, "Sync registry (initial push)", "Sync registry (push local after import failure)");
 
-        if (allowGithub && githubEnabled) {
-            GitHubFile remoteFile = fetchGithubFile();
-            if (remoteFile != null && remoteFile.content != null && !remoteFile.content.isBlank()) {
-                loaded = loadFromJson(remoteFile.content);
-                if (loaded) {
-                    lastSyncedSha = remoteFile.sha;
-                    writeLocalJson(remoteFile.content);
-                    source = RegistrySyncSource.GITHUB;
-                }
+            if (res.importedRemote) {
+                lastSyncedSha = res.remoteSha;
+                loaded = true;
+                source = RegistrySyncSource.GITHUB;
             }
+            // if res.success && !importedRemote then either pushed or no-op; continue to local fallback
         }
 
         if (!loaded && storageFile.exists()) {
@@ -386,10 +366,13 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
         String json = buildJsonPayload();
         writeLocalJson(json);
 
-        if (githubEnabled && githubSyncOnSave) {
+        if (githubConfig.isEnabled() && githubConfig.isSyncOnSave()) {
             String payload = json;
             String msg = commitMessage == null || commitMessage.isBlank() ? "Update custom item registry" : commitMessage;
-            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> pushGithubFile(payload, null, msg));
+            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+                GitHubSyncer syncer = new GitHubSyncer(plugin, githubClient);
+                syncer.pushLocal(() -> payload, msg);
+            });
         }
     }
 
@@ -509,295 +492,10 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
     }
 
     private String buildJsonPayload() {
-        Map<String, Object> root = new LinkedHashMap<>();
-        root.put("schema", 1);
-
-        List<Map<String, Object>> items = new ArrayList<>();
-        for (CustomItemDefinition definition : getDefinitions()) {
-            items.add(definition.serialize());
-        }
-        root.put("items", items);
-
-        return gson.toJson(root);
+        return RegistryJsonExporter.export(getDefinitions());
     }
 
-    private boolean pushGithubFile(String json) {
-        if (!isGithubConfigured()) {
-            plugin.getLogger().warning("GitHub registry sync is enabled but repo settings are missing.");
-            return false;
-        }
-
-        if (githubToken.isBlank()) {
-            plugin.getLogger().warning("GitHub registry sync token missing; skipping push.");
-            return false;
-        }
-
-        GitHubFile remoteFile = fetchGithubFile();
-        if (remoteFile != null) {
-            if (lastSyncedSha == null || !lastSyncedSha.equals(remoteFile.sha)) {
-                if (!isSameJson(remoteFile.content, json)) {
-                    plugin.getLogger().warning("Registry sync conflict detected. Remote file changed; skipping push.");
-                    return false;
-                }
-
-                lastSyncedSha = remoteFile.sha;
-                return true;
-            }
-
-            if (isSameJson(remoteFile.content, json)) {
-                lastSyncedSha = remoteFile.sha;
-                return true;
-            }
-        }
-
-        String body = buildGithubPutPayload(json, remoteFile == null ? null : remoteFile.sha, "Update custom item registry");
-        GitHubResponse response = sendGithubRequest("PUT", buildGithubContentUrl(), githubToken, body);
-        if (response == null) {
-            return false;
-        }
-
-        if (response.status >= 200 && response.status < 300) {
-            try {
-                JsonObject jsonResponse = gson.fromJson(response.body, JsonObject.class);
-                if (jsonResponse != null && jsonResponse.has("content")) {
-                    JsonObject content = jsonResponse.getAsJsonObject("content");
-                    if (content != null && content.has("sha")) {
-                        lastSyncedSha = content.get("sha").getAsString();
-                    }
-                }
-            } catch (Exception exception) {
-                plugin.getLogger().warning("Registry sync succeeded but could not parse response: " + exception.getMessage());
-            }
-            return true;
-        }
-
-        plugin.getLogger().warning("Registry sync failed (" + response.status + "): " + response.body);
-        return false;
-    }
-
-    private boolean pushGithubFile(String json, String sha, String message) {
-        if (!isGithubConfigured()) {
-            plugin.getLogger().warning("GitHub registry sync is enabled but repo settings are missing.");
-            return false;
-        }
-
-        if (githubToken.isBlank()) {
-            plugin.getLogger().warning("GitHub registry sync token missing; skipping push.");
-            return false;
-        }
-
-        GitHubFile remoteFile = fetchGithubFile();
-        if (remoteFile != null) {
-            if (lastSyncedSha == null || !lastSyncedSha.equals(remoteFile.sha)) {
-                if (!isSameJson(remoteFile.content, json)) {
-                    plugin.getLogger().warning("Registry sync conflict detected. Remote file changed; skipping push.");
-                    return false;
-                }
-
-                lastSyncedSha = remoteFile.sha;
-                return true;
-            }
-
-            if (isSameJson(remoteFile.content, json)) {
-                lastSyncedSha = remoteFile.sha;
-                return true;
-            }
-        }
-
-        String body = buildGithubPutPayload(json, remoteFile == null ? null : remoteFile.sha, message == null ? "Update custom item registry" : message);
-        GitHubResponse response = sendGithubRequest("PUT", buildGithubContentUrl(), githubToken, body);
-        if (response == null) {
-            return false;
-        }
-
-        if (response.status >= 200 && response.status < 300) {
-            try {
-                JsonObject jsonResponse = gson.fromJson(response.body, JsonObject.class);
-                if (jsonResponse != null && jsonResponse.has("content")) {
-                    JsonObject content = jsonResponse.getAsJsonObject("content");
-                    if (content != null && content.has("sha")) {
-                        lastSyncedSha = content.get("sha").getAsString();
-                    }
-                }
-            } catch (Exception exception) {
-                plugin.getLogger().warning("Registry sync succeeded but could not parse response: " + exception.getMessage());
-            }
-            return true;
-        }
-
-        plugin.getLogger().warning("Registry sync failed (" + response.status + "): " + response.body);
-        return false;
-    }
-
-    private GitHubFile fetchGithubFile() {
-        if (!isGithubConfigured()) {
-            return null;
-        }
-
-        String token = githubToken.isBlank() ? null : githubToken;
-        GitHubResponse response = sendGithubRequest("GET", buildGithubContentUrl(), token, null);
-        if (response == null) {
-            return null;
-        }
-
-        if (response.status == 404) {
-            return null;
-        }
-
-        if (response.status < 200 || response.status >= 300) {
-            plugin.getLogger().warning("Registry sync fetch failed (" + response.status + "): " + response.body);
-            return null;
-        }
-
-        try {
-            JsonObject jsonResponse = gson.fromJson(response.body, JsonObject.class);
-            if (jsonResponse == null) {
-                return null;
-            }
-
-            String sha = getJsonString(jsonResponse, "sha");
-            String contentEncoded = getJsonString(jsonResponse, "content");
-            String encoding = getJsonString(jsonResponse, "encoding");
-            if (contentEncoded == null || encoding == null) {
-                return null;
-            }
-
-            String content = contentEncoded;
-            if ("base64".equalsIgnoreCase(encoding)) {
-                String cleaned = contentEncoded.replace("\n", "").replace("\r", "");
-                content = new String(Base64.getDecoder().decode(cleaned), StandardCharsets.UTF_8);
-            }
-
-            return new GitHubFile(sha, content);
-        } catch (Exception exception) {
-            plugin.getLogger().warning("Registry sync parse failed: " + exception.getMessage());
-            return null;
-        }
-    }
-
-    private GitHubResponse sendGithubRequest(String method, String url, String token, String body) {
-        HttpURLConnection connection = null;
-        try {
-            connection = (HttpURLConnection) new URL(url).openConnection();
-            connection.setRequestMethod(method);
-            connection.setConnectTimeout(GITHUB_TIMEOUT_MS);
-            connection.setReadTimeout(GITHUB_TIMEOUT_MS);
-            connection.setRequestProperty("Accept", "application/vnd.github+json");
-            connection.setRequestProperty("User-Agent", GITHUB_USER_AGENT);
-            if (token != null && !token.isBlank()) {
-                connection.setRequestProperty("Authorization", "Bearer " + token);
-            }
-
-            if (body != null) {
-                connection.setDoOutput(true);
-                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-                try (OutputStream outputStream = connection.getOutputStream()) {
-                    outputStream.write(body.getBytes(StandardCharsets.UTF_8));
-                }
-            }
-
-            int status = connection.getResponseCode();
-            InputStream stream = status >= 200 && status < 300 ? connection.getInputStream() : connection.getErrorStream();
-            String responseBody = stream == null ? "" : new String(stream.readAllBytes(), StandardCharsets.UTF_8);
-            return new GitHubResponse(status, responseBody);
-        } catch (IOException exception) {
-            plugin.getLogger().warning("Registry sync request failed: " + exception.getMessage());
-            return null;
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
-        }
-    }
-
-    private String buildGithubPutPayload(String json, String sha, String message) {
-        JsonObject payload = new JsonObject();
-        payload.addProperty("message", message == null || message.isBlank() ? "Update custom item registry" : message);
-        payload.addProperty("content", Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8)));
-        payload.addProperty("branch", githubBranch);
-        if (sha != null && !sha.isBlank()) {
-            payload.addProperty("sha", sha);
-        }
-        return gson.toJson(payload);
-    }
-
-    private String buildGithubContentUrl() {
-        String encodedPath = githubPath.replace(" ", "%20");
-        String encodedBranch = githubBranch.replace(" ", "%20");
-        return GITHUB_API_BASE + "/repos/" + githubOwner + "/" + githubRepo + "/contents/" + encodedPath + "?ref=" + encodedBranch;
-    }
-
-    private boolean isGithubConfigured() {
-        return githubEnabled && !githubOwner.isBlank() && !githubRepo.isBlank() && !githubPath.isBlank();
-    }
-
-    private String loadGithubToken() {
-        String tokenFromSecrets = readTokenFromSecretsFile();
-        if (tokenFromSecrets != null && !tokenFromSecrets.isBlank()) {
-            return tokenFromSecrets.trim();
-        }
-
-        String tokenFromConfig = plugin.getConfig().getString("registry.github.token", "");
-        if (tokenFromConfig != null && !tokenFromConfig.isBlank()) {
-            plugin.getLogger().warning("GitHub token is set in config.yml. Move it to secrets.yml to keep it private.");
-        }
-        return tokenFromConfig == null ? "" : tokenFromConfig.trim();
-    }
-
-    private String readTokenFromSecretsFile() {
-        if (!secretsFile.exists()) {
-            return "";
-        }
-
-        YamlConfiguration configuration = YamlConfiguration.loadConfiguration(secretsFile);
-        return configuration.getString("registry.github.token", "");
-    }
-
-    private String sanitizeSegment(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.trim();
-    }
-
-    private String sanitizePath(String path) {
-        if (path == null) {
-            return "";
-        }
-        String normalized = path.trim().replace("\\", "/");
-        while (normalized.startsWith("/")) {
-            normalized = normalized.substring(1);
-        }
-        return normalized;
-    }
-
-    private String getJsonString(JsonObject object, String key) {
-        if (object == null || key == null || !object.has(key)) {
-            return null;
-        }
-        JsonElement value = object.get(key);
-        if (value == null || value.isJsonNull()) {
-            return null;
-        }
-        return value.getAsString();
-    }
-
-    private boolean isSameJson(String left, String right) {
-        if (left == null || right == null) {
-            return false;
-        }
-
-        try {
-            JsonElement leftElement = gson.fromJson(left, JsonElement.class);
-            JsonElement rightElement = gson.fromJson(right, JsonElement.class);
-            if (leftElement == null || rightElement == null) {
-                return left.equals(right);
-            }
-            return leftElement.equals(rightElement);
-        } catch (Exception exception) {
-            return left.equals(right);
-        }
-    }
+    
 
     private String resolveDisplayName(ItemStack itemStack, String fallbackName) {
         if (!itemStack.hasItemMeta()) {
@@ -826,23 +524,5 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
         itemStack.setItemMeta(meta);
     }
 
-    private static final class GitHubFile {
-        private final String sha;
-        private final String content;
-
-        private GitHubFile(String sha, String content) {
-            this.sha = sha;
-            this.content = content;
-        }
-    }
-
-    private static final class GitHubResponse {
-        private final int status;
-        private final String body;
-
-        private GitHubResponse(int status, String body) {
-            this.status = status;
-            this.body = body;
-        }
-    }
+    
 }

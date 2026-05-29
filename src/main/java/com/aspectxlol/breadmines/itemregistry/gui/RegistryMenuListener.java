@@ -21,6 +21,9 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.Map;
 import java.util.UUID;
+import com.aspectxlol.breadmines.itemregistry.gui.PendingSign;
+import com.aspectxlol.breadmines.itemregistry.gui.PendingSignAction;
+import com.aspectxlol.breadmines.itemregistry.gui.RegistrySignPrompter;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class RegistryMenuListener implements Listener {
@@ -33,12 +36,14 @@ public class RegistryMenuListener implements Listener {
     private final RegistryEntryMenu entryMenu;
     private final CustomItemRegistry registry;
     private final Map<UUID, PendingSign> pendingSigns = new ConcurrentHashMap<>();
+    private final RegistrySignPrompter signPrompter;
 
     public RegistryMenuListener(Breadmines plugin) {
         this.plugin = plugin;
         this.menu = new RegistryMenu(plugin);
         this.entryMenu = new RegistryEntryMenu(plugin);
         this.registry = plugin.getCustomItemRegistry();
+        this.signPrompter = new RegistrySignPrompter(plugin);
     }
 
     @EventHandler
@@ -92,7 +97,7 @@ public class RegistryMenuListener implements Listener {
             return;
         }
 
-        String query = buildSearchQuery(event.getLines());
+        String query = RegistrySignPrompter.buildSearchQuery(event.getLines());
         pending.restore();
 
         if (pending.action == PendingSignAction.SEARCH) {
@@ -142,12 +147,10 @@ public class RegistryMenuListener implements Listener {
 
         switch (rawSlot) {
             case RegistryMenu.SLOT_PREV_PAGE:
-                if (currentPage > 1) {
-                    menu.open(player, currentPage - 1, sortMode, searchQuery);
-                }
+                if (currentPage > 1) menu.open(player, currentPage - 1, sortMode, searchQuery);
                 return;
             case RegistryMenu.SLOT_SEARCH:
-                openSearchPrompt(player, sortMode, searchQuery);
+                signPrompter.openSearchPrompt(player, pendingSigns, sortMode, searchQuery);
                 return;
             case RegistryMenu.SLOT_SORT:
                 menu.open(player, 1, sortMode.next(), searchQuery);
@@ -156,9 +159,7 @@ public class RegistryMenuListener implements Listener {
                 menu.open(player, 1, RegistrySortMode.NAME_ASC, null);
                 return;
             case RegistryMenu.SLOT_NEXT_PAGE:
-                if (currentPage < totalPages) {
-                    menu.open(player, currentPage + 1, sortMode, searchQuery);
-                }
+                if (currentPage < totalPages) menu.open(player, currentPage + 1, sortMode, searchQuery);
                 return;
             case RegistryMenu.SLOT_CLOSE:
                 player.closeInventory();
@@ -218,7 +219,7 @@ public class RegistryMenuListener implements Listener {
                 }
                 return;
             case RegistryEntryMenu.SLOT_RENAME:
-                openRenamePrompt(player, holder);
+                signPrompter.openRenamePrompt(player, pendingSigns, holder);
                 return;
             case RegistryEntryMenu.SLOT_BACK:
                 menu.open(player, holder.getReturnPage(), sortMode, searchQuery);
@@ -231,137 +232,5 @@ public class RegistryMenuListener implements Listener {
         }
     }
 
-    private void openSearchPrompt(Player player, RegistrySortMode sortMode, String currentQuery) {
-        PendingSign existing = pendingSigns.remove(player.getUniqueId());
-        if (existing != null) {
-            existing.restore();
-        }
-
-        player.closeInventory();
-
-        Block signBlock = findSignBlock(player);
-        if (signBlock == null) {
-            player.sendMessage(ChatColor.RED + "No space to open search prompt.");
-            return;
-        }
-
-        BlockState previousState = signBlock.getState();
-        signBlock.setType(Material.OAK_SIGN, false);
-        BlockState newState = signBlock.getState();
-        if (!(newState instanceof Sign sign)) {
-            previousState.update(true, false);
-            player.sendMessage(ChatColor.RED + "Search prompt failed to open.");
-            return;
-        }
-
-        sign.setLine(0, "Search");
-        sign.setLine(1, currentQuery == null ? "" : currentQuery);
-        sign.setLine(2, "");
-        sign.setLine(3, "");
-        sign.update(true, false);
-
-        pendingSigns.put(player.getUniqueId(), new PendingSign(signBlock.getLocation(), previousState, PendingSignAction.SEARCH, sortMode, null, null, 1));
-        player.openSign(sign);
-    }
-
-    private void openRenamePrompt(Player player, RegistryEntryMenuHolder holder) {
-        PendingSign existing = pendingSigns.remove(player.getUniqueId());
-        if (existing != null) {
-            existing.restore();
-        }
-
-        player.closeInventory();
-
-        Block signBlock = findSignBlock(player);
-        if (signBlock == null) {
-            player.sendMessage(ChatColor.RED + "No space to open rename prompt.");
-            entryMenu.open(player, holder.getRegistryKey(), holder.getReturnPage(), holder.getSortMode(), holder.getSearchQuery());
-            return;
-        }
-
-        BlockState previousState = signBlock.getState();
-        signBlock.setType(Material.OAK_SIGN, false);
-        BlockState newState = signBlock.getState();
-        if (!(newState instanceof Sign sign)) {
-            previousState.update(true, false);
-            player.sendMessage(ChatColor.RED + "Rename prompt failed to open.");
-            entryMenu.open(player, holder.getRegistryKey(), holder.getReturnPage(), holder.getSortMode(), holder.getSearchQuery());
-            return;
-        }
-
-        sign.setLine(0, "Rename Key");
-        sign.setLine(1, holder.getRegistryKey());
-        sign.setLine(2, "");
-        sign.setLine(3, "");
-        sign.update(true, false);
-
-        pendingSigns.put(player.getUniqueId(), new PendingSign(signBlock.getLocation(), previousState, PendingSignAction.RENAME, holder.getSortMode(), holder.getSearchQuery(), holder.getRegistryKey(), holder.getReturnPage()));
-        player.openSign(sign);
-    }
-
-    private Block findSignBlock(Player player) {
-        Block baseBlock = player.getLocation().getBlock();
-        for (int offset = SEARCH_SIGN_OFFSET_MIN; offset <= SEARCH_SIGN_OFFSET_MAX; offset++) {
-            Block candidate = baseBlock.getRelative(0, offset, 0);
-            if (candidate.getType().isAir()) {
-                return candidate;
-            }
-        }
-
-        return null;
-    }
-
-    private String buildSearchQuery(String[] lines) {
-        if (lines == null || lines.length == 0) {
-            return "";
-        }
-
-        StringBuilder builder = new StringBuilder();
-        for (String line : lines) {
-            if (line == null) {
-                continue;
-            }
-
-            String trimmed = line.trim();
-            if (trimmed.isEmpty()) {
-                continue;
-            }
-
-            if (builder.length() > 0) {
-                builder.append(' ');
-            }
-            builder.append(trimmed);
-        }
-
-        return builder.toString();
-    }
-
-    private enum PendingSignAction {
-        SEARCH,
-        RENAME
-    }
-
-    private static final class PendingSign {
-        private final Location location;
-        private final BlockState previousState;
-        private final PendingSignAction action;
-        private final RegistrySortMode sortMode;
-        private final String searchQuery;
-        private final String registryKey;
-        private final int returnPage;
-
-        private PendingSign(Location location, BlockState previousState, PendingSignAction action, RegistrySortMode sortMode, String searchQuery, String registryKey, int returnPage) {
-            this.location = location;
-            this.previousState = previousState;
-            this.action = action;
-            this.sortMode = sortMode;
-            this.searchQuery = searchQuery;
-            this.registryKey = registryKey;
-            this.returnPage = returnPage;
-        }
-
-        private void restore() {
-            previousState.update(true, false);
-        }
-    }
+    
 }
