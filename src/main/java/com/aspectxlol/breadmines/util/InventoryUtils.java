@@ -111,8 +111,8 @@ public final class InventoryUtils {
         String candidateName = normalizeDisplayName(candidateMeta);
         String definitionName = normalizeDisplayName(definitionMeta);
 
-        // For plain items with no custom name, match by material only.
-        if (candidateName.isEmpty() || definitionName.isEmpty()) {
+        // Only plain items should fall back to material matching.
+        if (candidateName.isEmpty() && definitionName.isEmpty()) {
             return true;
         }
 
