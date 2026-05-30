@@ -74,6 +74,12 @@ public final class GitHubClient {
 
     public boolean pushFile(String json, String sha, String message) {
         if (!isConfigured()) return false;
+        if (sha == null || sha.isBlank()) {
+            GitHubFile remote = fetchFile();
+            if (remote != null && remote.sha != null && !remote.sha.isBlank()) {
+                sha = remote.sha;
+            }
+        }
         String body = buildGithubPutPayload(json, sha, message);
         GitHubResponse response = sendGithubRequest("PUT", buildGithubContentUrl(), token, body);
         if (response == null) return false;
