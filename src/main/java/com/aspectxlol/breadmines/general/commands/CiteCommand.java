@@ -15,9 +15,15 @@ import java.util.Locale;
 import java.util.stream.Collectors;
 
 public final class CiteCommand implements CommandExecutor, TabCompleter {
+    private static final String PERMISSION = "breadmines.cite";
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (!sender.hasPermission(PERMISSION)) {
+            sender.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
+            return true;
+        }
+
         if (args.length < 2) {
             sender.sendMessage(ChatColor.RED + "Usage: /cite <player> <rule>");
             sender.sendMessage(ChatColor.GRAY + "Available rules: " + ChatColor.YELLOW + String.join(", ", RulesCatalog.ruleSuggestions()));
@@ -52,6 +58,10 @@ public final class CiteCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (!sender.hasPermission(PERMISSION)) {
+            return Collections.emptyList();
+        }
+
         if (args.length == 1) {
             String prefix = args[0].toLowerCase(Locale.ROOT);
             List<String> names = Bukkit.getOnlinePlayers().stream()

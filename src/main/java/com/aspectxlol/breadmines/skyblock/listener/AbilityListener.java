@@ -18,7 +18,10 @@ import org.bukkit.event.block.Action;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
+
+import java.lang.reflect.Method;
 
 /**
  * AbilityListener - Handles right-click ability triggers for custom Necron items.
@@ -39,9 +42,11 @@ public class AbilityListener implements Listener {
 
     private final Breadmines plugin;
     private final ManaManager manaManager;
+    private final Plugin essentialsPlugin;
     public AbilityListener(Breadmines plugin) {
         this.plugin = plugin;
         this.manaManager = plugin.getManaManager();
+        this.essentialsPlugin = plugin.getServer().getPluginManager().getPlugin("Essentials");
         com.aspectxlol.breadmines.skyblock.listener.EtherwarpPreviewTask.start(plugin);
     }
 
@@ -57,7 +62,7 @@ public class AbilityListener implements Listener {
                 }
 
                 for (Player player : plugin.getServer().getOnlinePlayers()) {
-                    if (player == null || !player.isSneaking()) {
+                    if (player == null || !player.isSneaking() || isJailed(player)) {
                         continue;
                     }
 
@@ -104,6 +109,12 @@ public class AbilityListener implements Listener {
         }
         
         Player player = event.getPlayer();
+
+                if (isJailed(player)) {
+                    event.setCancelled(true);
+                    player.sendMessage(ChatColor.RED + "You cannot use abilities while jailed.");
+                    return;
+                }
 
         // Cancel if system is disabled
         if (!plugin.isSystemEnabled()) {
@@ -350,6 +361,26 @@ public class AbilityListener implements Listener {
             targetWorld.spawnParticle(Particle.DRAGON_BREATH, targetLoc, 20, 0.8, 0.8, 0.8, 0.4);
             targetWorld.spawnParticle(Particle.END_ROD, targetLoc, 15, 0.5, 0.5, 0.5, 0.2);
             targetWorld.playSound(targetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 0.9f, 1.1f);
+        }
+    }
+
+    private boolean isJailed(Player player) {
+        if (player == null || essentialsPlugin == null || !essentialsPlugin.isEnabled()) {
+            return false;
+        }
+
+        try {
+            Method getUserMethod = essentialsPlugin.getClass().getMethod("getUser", Player.class);
+            Object user = getUserMethod.invoke(essentialsPlugin, player);
+            if (user == null) {
+                return false;
+            }
+
+            Method isJailedMethod = user.getClass().getMethod("isJailed");
+            Object result = isJailedMethod.invoke(user);
+            return result instanceof Boolean && (Boolean) result;
+        } catch (ReflectiveOperationException exception) {
+            return false;
         }
     }
 

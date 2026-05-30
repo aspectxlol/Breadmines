@@ -41,6 +41,7 @@ commands:
   cite:
     description: "Cite a server rule to a player"
     usage: "/cite <player> <rule>"
+    permission: breadmines.cite
 
 permissions:
   admin.setup:
@@ -54,4 +55,7 @@ permissions:
     default: op
   breadmines.recipe:
     description: "Permission to manage autocompressor recipes"
+    default: op
+  breadmines.cite:
+    description: "Permission to cite a server rule to a player"
     default: op
