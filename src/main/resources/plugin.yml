@@ -35,6 +35,12 @@ commands:
     usage: "/recipe <create|update|delete|list|info|sync|debug> ..."
     permission: breadmines.recipe
     aliases: [recipes, rcp, rec]
+  rules:
+    description: "Show the server rules"
+    usage: "/rules"
+  cite:
+    description: "Cite a server rule to a player"
+    usage: "/cite <player> <rule>"
 
 permissions:
   admin.setup:

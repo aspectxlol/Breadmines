@@ -5,8 +5,10 @@ import com.aspectxlol.breadmines.drops.command.DropCommandHandler;
 import com.aspectxlol.breadmines.drops.command.DropTabCompleter;
 import com.aspectxlol.breadmines.drops.listener.DropBlockListener;
 import com.aspectxlol.breadmines.general.recipes.RecipeManager;
+import com.aspectxlol.breadmines.general.commands.CiteCommand;
 import com.aspectxlol.breadmines.general.recipes.command.RecipeCommand;
 import com.aspectxlol.breadmines.general.recipes.gui.RecipeListMenuListener;
+import com.aspectxlol.breadmines.general.commands.RulesCommand;
 import com.aspectxlol.breadmines.itemregistry.CustomItemRegistry;
 import com.aspectxlol.breadmines.itemregistry.CustomItemRegistryApi;
 import com.aspectxlol.breadmines.itemregistry.command.RegistryCommand;
@@ -200,6 +202,14 @@ public final class Breadmines extends JavaPlugin {
         getCommand("recipe").setExecutor(recipeCommand);
         getCommand("recipe").setTabCompleter(new com.aspectxlol.breadmines.general.recipes.command.RecipeTabCompleter(this));
         Bukkit.getPluginManager().registerEvents(new RecipeListMenuListener(this), this);
+
+        RulesCommand rulesCommand = new RulesCommand(this);
+        getCommand("rules").setExecutor(rulesCommand);
+        Bukkit.getPluginManager().registerEvents(rulesCommand, this);
+
+        CiteCommand citeCommand = new CiteCommand();
+        getCommand("cite").setExecutor(citeCommand);
+        getCommand("cite").setTabCompleter(citeCommand);
 
         startAutoCompressorTask();
         getLogger().info(ChatColor.GREEN + "✓ General recipe/autocompressor system initialized!");
