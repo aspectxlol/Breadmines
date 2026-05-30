@@ -186,36 +186,35 @@ public class DropSystemHandler {
             return false;
         }
 
-        GitHubClient.GitHubFile remote = githubClient.fetchFile();
         String localJson = exportToJson();
+        return githubClient.pushFile(localJson, null, "Sync drops (push local)");
+    }
 
-        if (remote == null) {
-            // No remote file — push local
-            return githubClient.pushFile(localJson, null, "Sync drops (initial push)");
+    public synchronized boolean syncFromGithub() {
+        if (!isGithubConfigured()) {
+            plugin.getLogger().warning("Drops GitHub sync not configured; skipping.");
+            return false;
         }
 
-        if (lastSyncedSha != null && !lastSyncedSha.equals(remote.sha)) {
-            if (!GitHubClient.isSameJson(remote.content, localJson)) {
-                plugin.getLogger().warning("Drops registry sync conflict detected; remote changed. Skipping push.");
+        GitHubClient.GitHubFile remote = githubClient.fetchFile();
+        if (remote == null || remote.content == null || remote.content.isBlank()) {
+            plugin.getLogger().warning("Drops GitHub pull failed: remote file not available.");
+            return false;
+        }
+
+        try {
+            boolean imported = importFromJson(remote.content);
+            if (!imported) {
+                plugin.getLogger().warning("Drops GitHub pull failed: could not import remote data.");
                 return false;
             }
+
             lastSyncedSha = remote.sha;
             return true;
+        } catch (Exception e) {
+            plugin.getLogger().warning("Drops GitHub pull failed: " + e.getMessage());
+            return false;
         }
-
-        // If remote differs and we don't have a lastSyncedSha (or it equals), prefer remote -> import
-        if (!GitHubClient.isSameJson(remote.content, localJson)) {
-            boolean imported = importFromJson(remote.content);
-            if (imported) {
-                lastSyncedSha = remote.sha;
-                return true;
-            }
-            // If import failed, attempt to push local
-            return githubClient.pushFile(localJson, remote.sha, "Sync drops (push local after import failure)");
-        }
-
-        lastSyncedSha = remote.sha;
-        return true;
     }
 
     private String exportToJson() {

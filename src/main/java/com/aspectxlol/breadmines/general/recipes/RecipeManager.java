@@ -292,26 +292,40 @@ public final class RecipeManager {
         }
 
         com.aspectxlol.breadmines.util.GitHubSyncer syncer = new com.aspectxlol.breadmines.util.GitHubSyncer(plugin, githubClient);
-        com.aspectxlol.breadmines.util.GitHubSyncer.SyncResult res = syncer.sync(
-            () -> RecipeJsonSerializer.export(getRecipes()),
-            (json) -> RecipeJsonSerializer.importIntoRepository(json, repository),
-            "Sync recipes (initial push)",
-            "Sync recipes (push local after import failure)"
-        );
+        boolean pushed = syncer.pushLocal(() -> RecipeJsonSerializer.export(getRecipes()), "Sync recipes (push local)");
 
-        if (res.importedRemote && res.remoteSha != null) {
-            try {
-                load();
-            } catch (SQLException e) {
-                plugin.getLogger().warning("Failed to reload recipes after import: " + e.getMessage());
-            }
-        }
-
-        if (!res.success) {
+        if (!pushed) {
             plugin.getLogger().warning("Recipes sync failed or skipped.");
         }
 
-        return res.success;
+        return pushed;
+    }
+
+    public synchronized boolean syncFromGithub() {
+        if (!githubConfig.isEnabled() || !githubClient.isConfigured()) {
+            plugin.getLogger().warning("Recipes GitHub sync not configured; skipping.");
+            return false;
+        }
+
+        com.aspectxlol.breadmines.util.GitHubClient.GitHubFile remote = githubClient.fetchFile();
+        if (remote == null || remote.content == null || remote.content.isBlank()) {
+            plugin.getLogger().warning("Recipes GitHub pull failed: remote file not available.");
+            return false;
+        }
+
+        try {
+            boolean imported = RecipeJsonSerializer.importIntoRepository(remote.content, repository);
+            if (!imported) {
+                plugin.getLogger().warning("Recipes GitHub pull failed: could not import remote data.");
+                return false;
+            }
+
+            load();
+            return true;
+        } catch (SQLException e) {
+            plugin.getLogger().warning("Recipes GitHub pull failed: " + e.getMessage());
+            return false;
+        }
     }
 
     

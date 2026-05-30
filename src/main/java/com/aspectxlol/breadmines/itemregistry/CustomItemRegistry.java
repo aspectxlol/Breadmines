@@ -58,7 +58,7 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
     private volatile String lastSyncedSha;
     private final GitHubClient githubClient;
 
-    private enum RegistrySyncSource { NONE, GITHUB, LOCAL, LEGACY }
+    private enum RegistrySyncSource { NONE, GITHUB, PUSHED, LOCAL, LEGACY }
 
     public static final class RegistrySyncResult {
         public final boolean loaded;
@@ -313,51 +313,54 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
     }
 
     public synchronized void load() {
-        syncInternal(githubConfig.isEnabled() && githubConfig.isSyncOnStartup());
-    }
-
-    public synchronized RegistrySyncResult syncNow() {
-        return syncInternal(true);
-    }
-
-    private RegistrySyncResult syncInternal(boolean allowGithub) {
         definitions.clear();
 
         boolean loaded = false;
-        RegistrySyncSource source = RegistrySyncSource.NONE;
-        // Attempt GitHub sync/import first when allowed
-        if (allowGithub && githubConfig.isEnabled()) {
-            GitHubSyncer syncer = new GitHubSyncer(plugin, githubClient);
-            GitHubSyncer.SyncResult res = syncer.sync(() -> RegistryJsonExporter.export(getDefinitions()), (json) -> {
-                boolean ok = loadFromJson(json);
-                if (ok) writeLocalJson(json);
-                return ok;
-            }, "Sync registry (initial push)", "Sync registry (push local after import failure)");
-
-            if (res.importedRemote) {
-                lastSyncedSha = res.remoteSha;
-                loaded = true;
-                source = RegistrySyncSource.GITHUB;
-            }
-            // if res.success && !importedRemote then either pushed or no-op; continue to local fallback
-        }
-
-        if (!loaded && storageFile.exists()) {
+        if (storageFile.exists()) {
             loaded = loadFromJsonFile(storageFile);
-            if (loaded) {
-                source = RegistrySyncSource.LOCAL;
-            }
         }
 
         if (!loaded && legacyStorageFile.exists()) {
             loaded = loadFromLegacyYaml(legacyStorageFile);
             if (loaded) {
                 save("Migrate legacy registry");
-                source = RegistrySyncSource.LEGACY;
             }
         }
 
-        return new RegistrySyncResult(loaded, source.name(), definitions.size());
+        if (loaded && githubConfig.isEnabled() && githubConfig.isSyncOnStartup()) {
+            pushCurrentDefinitions("Sync registry (startup push)");
+        }
+    }
+
+    public synchronized RegistrySyncResult syncNow() {
+        boolean pushed = pushCurrentDefinitions("Sync registry (manual push)");
+        return new RegistrySyncResult(pushed, RegistrySyncSource.PUSHED.name(), definitions.size());
+    }
+
+    public synchronized RegistrySyncResult syncFromGithub() {
+        if (!githubConfig.isEnabled() || !githubClient.isConfigured()) {
+            plugin.getLogger().warning("Registry GitHub sync not configured; skipping.");
+            return new RegistrySyncResult(false, RegistrySyncSource.NONE.name(), definitions.size());
+        }
+
+        GitHubClient.GitHubFile remote = githubClient.fetchFile();
+        if (remote == null || remote.content == null || remote.content.isBlank()) {
+            plugin.getLogger().warning("Registry GitHub sync pull failed: remote file not available.");
+            return new RegistrySyncResult(false, RegistrySyncSource.NONE.name(), definitions.size());
+        }
+
+        Map<String, CustomItemDefinition> previousDefinitions = new LinkedHashMap<>(definitions);
+        definitions.clear();
+        if (!loadFromJson(remote.content)) {
+            definitions.clear();
+            definitions.putAll(previousDefinitions);
+            plugin.getLogger().warning("Registry GitHub sync pull failed: unable to parse remote data.");
+            return new RegistrySyncResult(false, RegistrySyncSource.NONE.name(), definitions.size());
+        }
+
+        writeLocalJson(remote.content);
+        lastSyncedSha = remote.sha;
+        return new RegistrySyncResult(true, RegistrySyncSource.GITHUB.name(), definitions.size());
     }
 
     public synchronized void save() {
@@ -380,6 +383,17 @@ public class CustomItemRegistry implements CustomItemRegistryApi {
                 syncer.pushLocal(() -> payload, msg);
             });
         }
+    }
+
+    private boolean pushCurrentDefinitions(String commitMessage) {
+        if (!githubConfig.isEnabled() || !githubClient.isConfigured()) {
+            return false;
+        }
+
+        GitHubSyncer syncer = new GitHubSyncer(plugin, githubClient);
+        String payload = RegistryJsonExporter.export(getDefinitions());
+        String msg = commitMessage == null || commitMessage.isBlank() ? "Update custom item registry" : commitMessage;
+        return syncer.pushLocal(() -> payload, msg);
     }
 
     private boolean ensureDataFolder() {

@@ -70,7 +70,7 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
             case "query":
                 return handleSearch(sender, label, args);
             case "sync":
-                return handleSync(sender);
+                return handleSync(sender, args);
             case "debug":
                 return handleDebug(sender, label, args);
             default:
@@ -90,6 +90,10 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
             String subcommand = args[0].toLowerCase(Locale.ROOT);
             if (subcommand.equals("get") || subcommand.equals("give") || subcommand.equals("remove") || subcommand.equals("delete") || subcommand.equals("rm") || subcommand.equals("del")) {
                 return filterByPrefix(args[1], getRegistryNames());
+            }
+
+            if (subcommand.equals("sync")) {
+                return filterByPrefix(args[1], Arrays.asList("push", "pull"));
             }
 
             if (subcommand.equals("debug")) {
@@ -214,17 +218,24 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    private boolean handleSync(CommandSender sender) {
+    private boolean handleSync(CommandSender sender, String[] args) {
         if (!sender.hasPermission("breadmines.registry")) {
             sender.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
             return true;
         }
 
-        sender.sendMessage(ChatColor.GRAY + "Synchronizing registry... This may take a moment.");
+        String mode = args.length >= 2 ? args[1].toLowerCase(Locale.ROOT) : "push";
+        sender.sendMessage(ChatColor.GRAY + "Synchronizing registry (" + mode + ")... This may take a moment.");
         try {
-            CustomItemRegistry.RegistrySyncResult result = registry.syncNow();
+            CustomItemRegistry.RegistrySyncResult result;
+            if (mode.equals("pull")) {
+                result = registry.syncFromGithub();
+            } else {
+                result = registry.syncNow();
+            }
+
             if (result.loaded) {
-                sender.sendMessage(ChatColor.GREEN + "✓ Registry synchronized (source: " + result.sourceName + ") with " + result.count + " entries.");
+                sender.sendMessage(ChatColor.GREEN + "✓ Registry synchronized (mode: " + mode + ", source: " + result.sourceName + ") with " + result.count + " entries.");
             } else {
                 sender.sendMessage(ChatColor.RED + "✗ Registry synchronization failed or no data found.");
             }
@@ -264,7 +275,7 @@ public class RegistryCommand implements CommandExecutor, TabCompleter {
 
     private void sendUsage(CommandSender sender, String label) {
         sender.sendMessage(ChatColor.YELLOW + "Usage: /" + label + " <add|lazyadd|get|remove|delete|list|search> ...");
-        sender.sendMessage(ChatColor.YELLOW + "Additional: /" + label + " sync - synchronize registry with configured sources");
+        sender.sendMessage(ChatColor.YELLOW + "Additional: /" + label + " sync [push|pull] - push local registry or pull from GitHub");
         sender.sendMessage(ChatColor.YELLOW + "Additional: /" + label + " debug held - inspect the held item and registry match");
         sender.sendMessage(ChatColor.GRAY + "Add uses an explicit name. Lazyadd uses the held item's display name. Search ranks exact and partial matches across item id, name, type, and lore.");
         sender.sendMessage(ChatColor.GRAY + "Aliases: /" + label + " register, store, lazy, give, delete, rm, del, ls, show, find, query");

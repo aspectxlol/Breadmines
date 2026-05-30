@@ -55,7 +55,7 @@ public final class RecipeCommand implements CommandExecutor {
                 case "update":
                     return handleCreateOrUpdate(sender, label, args);
                 case "sync":
-                    return handleSync(sender);
+                    return handleSync(sender, label, args);
                 case "delete":
                 case "remove":
                     return handleDelete(sender, label, args);
@@ -153,15 +153,16 @@ public final class RecipeCommand implements CommandExecutor {
         return true;
     }
 
-    private boolean handleSync(CommandSender sender) {
+    private boolean handleSync(CommandSender sender, String label, String[] args) {
         if (!CommandUtils.requirePermission(sender, "breadmines.recipe")) {
             return true;
         }
 
+        String mode = args.length >= 2 ? args[1].toLowerCase(Locale.ROOT) : "push";
         try {
-            boolean ok = recipeManager.syncWithGithub();
+            boolean ok = mode.equals("pull") ? recipeManager.syncFromGithub() : recipeManager.syncWithGithub();
             if (ok) {
-                sender.sendMessage(ChatColor.GREEN + "✓ Recipes synchronized with GitHub. Total: " + recipeManager.getRecipes().size());
+                sender.sendMessage(ChatColor.GREEN + "✓ Recipes synchronized (mode: " + mode + ") with GitHub. Total: " + recipeManager.getRecipes().size());
             } else {
                 if (!recipeManager.isGithubConfigured()) {
                     sender.sendMessage(ChatColor.YELLOW + "⚠ Recipe sync is not configured yet.");
